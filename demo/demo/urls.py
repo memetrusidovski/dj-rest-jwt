@@ -45,8 +45,8 @@ urlpatterns = [
         TemplateView.as_view(template_name="password_reset_confirm.html"),
         name='password_reset_confirm'),
 
-    re_path(r'^dj-rest-auth/', include('dj_rest_auth.urls')),
-    re_path(r'^dj-rest-auth/registration/', include('dj_rest_auth.registration.urls')),
+    re_path(r'^dj-rest-jwt/', include('dj_rest_jwt.urls')),
+    re_path(r'^dj-rest-jwt/registration/', include('dj_rest_jwt.registration.urls')),
     re_path(r'^account/', include('allauth.urls')),
     re_path(r'^admin/', admin.site.urls),
     re_path(r'^accounts/profile/$', RedirectView.as_view(url='/', permanent=True), name='profile-redirect'),

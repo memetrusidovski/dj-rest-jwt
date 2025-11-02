@@ -1,0 +1,110 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dj-rest-jwt"
+version = "0.1.0"  # Or read from __version__.py using dynamic
+description = "JWT authentication for Django REST Framework."
+readme = "README.md"
+authors = [
+    { name = "Met", email = "met@example.com" },
+]
+license = { text = "MIT" }
+requires-python = ">=3.10"
+keywords = [
+    "django",
+    "rest",
+    "auth",
+    "authentication",
+    "jwt",
+    "rest-framework",
+    "api",
+    "registration",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Framework :: Django :: 4.2",
+    "Framework :: Django :: 5.0",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development",
+]
+
+dependencies = [
+    "Django>=4.2,<6.0",
+    "djangorestframework>=3.13.0",
+    "djangorestframework-simplejwt>=5.3",
+    "PyJWT>=2.8.0",
+    "cryptography>=41.0.0",
+]
+
+[project.optional-dependencies]
+with-social = [
+    "django-allauth[socialaccount]>=64.0.0",
+]
+
+dev = [
+    "black>=24.0.0",
+    "ruff>=0.1.0",
+    "pytest>=7.4.0",
+    "pytest-django>=4.5.0",
+    "django-allauth>=64.0.0",
+    "djangorestframework-simplejwt>=5.3.1",
+]
+
+tests = [
+    "coveralls>=1.11.1",
+    "django-allauth>=64.0.0",
+    "djangorestframework-simplejwt==5.3.1",
+    "responses>=0.12.1",
+    "flake8>=7.1.1",
+]
+
+demo = [
+    "drf-yasg>=1.21.7",
+    "django-cors-headers>=4.4.0",
+    "coreapi>=2.3.3",
+]
+
+[project.urls]
+Homepage = "https://github.com/met/dj-jwt-auth"
+Repository = "https://github.com/met/dj-jwt-auth"
+Issues = "https://github.com/met/dj-jwt-auth/issues"
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["dj_rest_jwt*"]
+
+[tool.setuptools.package-data]
+dj_rest_jwt = [
+    "locale/*/LC_MESSAGES/*.po",
+    "locale/*/LC_MESSAGES/*.mo",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py310', 'py311', 'py312']
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "I", "N", "UP"]
+ignore = ["E501"]
+exclude = ["migrations", ".venv", "build", "dist"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "demo.demo.settings"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+pythonpath = ["demo"]
+addopts = "-v --tb=short"

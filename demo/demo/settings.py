@@ -36,10 +36,10 @@ INSTALLED_APPS = (
     'django.contrib.sites',
     'rest_framework',
     'rest_framework.authtoken',
-    'dj_rest_auth',
+    'dj_rest_jwt',
     'allauth',
     'allauth.account',
-    'dj_rest_auth.registration',
+    'dj_rest_jwt.registration',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.facebook',
     'drf_yasg',
@@ -128,7 +128,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
-        'dj_rest_auth.jwt_auth.JWTCookieAuthentication'
+        'dj_rest_jwt.jwt_auth.JWTCookieAuthentication'
     ),
     'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema'
 }
