@@ -28,3 +28,5 @@ if api_settings.USE_JWT:
         re_path(r'token/verify/?$', TokenVerifyView.as_view(), name='token_verify'),
         re_path(r'token/refresh/?$', get_refresh_view().as_view(), name='token_refresh'),
     ]
+
+print("DJ-REST-JWT URLS LOADED") 

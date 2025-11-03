@@ -1,84 +1,220 @@
-# Dj-JWT-Auth
-[![<iMerica>](https://github.com/iMerica/dj-rest-auth/actions/workflows/main.yml/badge.svg)](https://github.com/iMerica/dj-rest-auth/actions/workflows/main.yml/)
+# DJ-REST-JWT
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Drop-in API endpoints for handling authentication securely in Django Rest Framework. Works especially well 
-with SPAs (e.g., React, Vue, Angular), and Mobile applications. 
+A modern, JWT-first authentication package for Django Rest Framework. Built to address the limitations of dj-rest-auth with better defaults, enhanced security features, and a focus on developer experience.
+
+## Why DJ-REST-JWT?
+
+DJ-REST-JWT is a reimagining of dj-rest-auth with JWT authentication as the primary focus. While dj-rest-auth requires extensive configuration and has limited support for modern authentication patterns, DJ-REST-JWT provides:
+
+- **JWT by default** - No configuration needed for secure, stateless authentication
+- **Enhanced security** - Built-in reCAPTCHA support and rate limiting
+- **Better email verification** - Reliable, token-based email verification flows
+- **Starter project included** - Get up and running in minutes with working examples
+- **Modern tooling** - Built with `uv` for faster dependency management
 
 ## Requirements
-- Django >= 4.2 (See Unit Test Coverage in CI)
+
+- Django >= 4.2
 - Python >= 3.8
+- djangorestframework >= 3.14
 
 ## Quick Setup
 
-Install package
+Install package using `uv`:
+```bash
+uv pip install dj-rest-jwt
+```
 
-    pip install dj-rest-auth
-    
-Add `dj_rest_auth` app to INSTALLED_APPS in your django settings.py:
+Or with pip:
+```bash
+pip install dj-rest-jwt
+```
 
+Add `dj_rest_jwt` to your `INSTALLED_APPS`:
 ```python
-INSTALLED_APPS = (
+INSTALLED_APPS = [
     ...,
     'rest_framework',
-    'rest_framework.authtoken',
-    ...,
-    'dj_rest_auth'
-)
-```
-    
-Add URL patterns
-
-```python
-urlpatterns = [
-    path('dj-rest-auth/', include('dj_rest_auth.urls')),
+    'dj_rest_jwt',
 ]
 ```
-    
 
-(Optional) Use Http-Only cookies
-
+Add URL patterns:
 ```python
-REST_AUTH = {
-    'USE_JWT': True,
-    'JWT_AUTH_COOKIE': 'jwt-auth',
+from django.urls import path, include
+
+urlpatterns = [
+    path('api/auth/', include('dj_rest_jwt.urls')),
+]
+```
+
+That's it! JWT authentication is enabled by default with secure http-only cookies.
+
+## Features
+
+### 🔐 JWT Authentication (Default)
+- Automatic JWT token generation and refresh
+- Secure http-only cookie support out of the box
+- Configurable token expiration and refresh strategies
+
+### 🛡️ Enhanced Security
+- **reCAPTCHA Integration** - Protect registration and login endpoints from bots
+- **Rate Limiting** - Built-in throttling for authentication endpoints
+- **CORS Support** - Proper CORS configuration for SPA applications
+- **Secure Password Reset** - Token-based password reset with expiration
+
+### ✉️ Reliable Email Verification
+- Token-based email verification that actually works
+- Customizable email templates
+- Magic link support for passwordless authentication
+- Resend verification email endpoint
+
+### 🚀 Developer Experience
+- **Starter Project** - Complete example project with React frontend
+- **Comprehensive Documentation** - Clear examples and troubleshooting guides
+- **Type Hints** - Full type annotation support
+- **Modern Testing** - Fast test suite with pytest
+
+### 📱 OAuth & Social Authentication
+Essential OAuth providers built-in:
+- Google OAuth 2.0
+- GitHub OAuth
+- Microsoft Azure AD
+- Custom OAuth provider support
+
+### 🎯 Production-Ready Features
+- **Multi-factor Authentication (MFA)** - TOTP support via authenticator apps
+- **Session Management** - View and revoke active sessions
+- **Audit Logging** - Track authentication events
+- **Account Deactivation** - Soft delete user accounts
+
+## Configuration
+
+DJ-REST-JWT works out of the box with sensible defaults. Customize as needed:
+```python
+# settings.py
+DJ_REST_JWT = {
+    # JWT Settings
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    
+    # Cookie Settings
+    'JWT_AUTH_COOKIE': 'jwt-access',
+    'JWT_AUTH_REFRESH_COOKIE': 'jwt-refresh',
+    'JWT_AUTH_SECURE': True,  # HTTPS only in production
+    'JWT_AUTH_SAMESITE': 'Lax',
+    
+    # Email Verification
+    'EMAIL_VERIFICATION': 'mandatory',  # or 'optional', 'none'
+    'EMAIL_VERIFICATION_TOKEN_LIFETIME': timedelta(days=3),
+    
+    # Security Features
+    'ENABLE_RECAPTCHA': True,
+    'RECAPTCHA_SITE_KEY': env('RECAPTCHA_SITE_KEY'),
+    'RECAPTCHA_SECRET_KEY': env('RECAPTCHA_SECRET_KEY'),
+    
+    # MFA
+    'ENABLE_MFA': True,
+    
+    # Rate Limiting
+    'ENABLE_RATE_LIMITING': True,
+    'RATE_LIMIT_REGISTRATION': '5/hour',
+    'RATE_LIMIT_LOGIN': '10/hour',
 }
 ```
 
+## Development
+
+This project uses `uv` for dependency management:
+```bash
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Clone the repository
+git clone https://github.com/yourusername/dj-rest-jwt.git
+cd dj-rest-jwt
+
+# Install dependencies
+uv sync
+
+# Run tests
+uv run pytest
+
+# Run the example project
+cd example_project
+uv run python manage.py migrate
+uv run python manage.py runserver
+```
+
 ### Testing
+```bash
+# Run all tests
+uv run pytest
 
-Install required modules with `pip install -r  dj_rest_auth/tests/requirements.txt`
+# Run with coverage
+uv run pytest --cov=dj_rest_jwt
 
-To run the tests within a virtualenv, run `python runtests.py` from the repository directory.
-The easiest way to run test coverage is with [`coverage`](https://pypi.org/project/coverage/),
-which runs the tests against all supported Django installs. To run the test coverage 
-within a virtualenv, run `coverage run ./runtests.py` from the repository directory then run `coverage report`.
+# Run specific test file
+uv run pytest tests/test_authentication.py
 
-#### Tox
+# Run linting
+uv run ruff check .
+uv run mypy dj_rest_jwt
+```
 
-Testing may also be done using [`tox`](https://pypi.org/project/tox/), which
-will run the tests against all supported combinations of Python and Django.
+## Starter Project
 
-Install tox, either globally or within a virtualenv, and then simply run `tox`
-from the repository directory. As there are many combinations, you may run them
-in [`parallel`](https://tox.readthedocs.io/en/latest/config.html#cmdoption-tox-p)
-using `tox --parallel`.
+The included starter project demonstrates:
+- Complete authentication flow (register, login, logout, refresh)
+- Email verification with resend functionality
+- Password reset flow
+- Protected API endpoints
+- React frontend with authentication hooks
+- reCAPTCHA integration
+```bash
+cd example_project
+uv run python manage.py migrate
+uv run python manage.py runserver
+```
 
-The `tox.ini` includes an environment for testing code [`coverage`](https://pypi.org/project/coverage/)
-and you can run it and view this report with `tox -e coverage`.
+Visit `http://localhost:3000` to see the demo.
 
-Linting may also be performed via [`flake8`](https://pypi.org/project/flake8/)
-by running `tox -e flake8`.
+## Documentation
 
-### Documentation
+Full documentation available at: https://dj-rest-jwt.readthedocs.io
 
-View the full documentation here: https://dj-rest-auth.readthedocs.io/en/latest/index.html
+## Roadmap
 
+- [ ] WebAuthn / Passkey support
+- [ ] OAuth 2.1 compliance
+- [ ] GraphQL authentication support
+- [ ] Admin dashboard for user management
+- [ ] Webhook notifications for auth events
 
-### Acknowledgements
+## Contributing
 
-This project began as a fork of `django-rest-auth`. Big thanks to everyone who contributed to that repo!
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
 
-#### A note on Django AllAuth from @iMerica
+## Why Not dj-rest-auth?
 
-This project has optional and very narrow support for Django-AllAuth. As the maintainer, I have no interest in making this package support all use cases in Django-AllAuth. I would rather focus on improving the quality of the base functionality or focus on OIDC support instead. Pull requests that extend or add more support for Django-AllAuth will most likely be declined. Do you disagree? Feel free to fork this repo!
+While dj-rest-auth is a solid package, it has some limitations:
+
+- Requires extensive configuration for JWT
+- Limited django-allauth integration with unclear boundaries
+- Email verification can be unreliable
+- Lacks modern security features like reCAPTCHA
+- No starter project or comprehensive examples
+
+DJ-REST-JWT addresses these issues while maintaining a focused scope and excellent developer experience.
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Acknowledgements
+
+Inspired by dj-rest-auth and django-allauth. Thanks to all contributors to those projects for paving the way!
