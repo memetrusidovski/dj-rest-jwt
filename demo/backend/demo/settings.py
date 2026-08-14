@@ -42,6 +42,7 @@ INSTALLED_APPS = (
     'allauth.mfa',
     'dj_rest_jwt.registration',
     'dj_rest_jwt.mfa',
+    'dj_rest_jwt.passkeys',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.facebook',
     'drf_yasg',
@@ -115,6 +116,15 @@ TEMPLATES = [
 REST_AUTH = {
     'SESSION_LOGIN': False,
     'USE_JWT': False,
+    # This demo showcases the classic Token-auth flow (matches
+    # DEFAULT_AUTHENTICATION_CLASSES below) rather than the package's default
+    # JWT-only mode, so TOKEN_MODEL has to be set explicitly now that it
+    # defaults to None.
+    'TOKEN_MODEL': 'rest_framework.authtoken.models.Token',
+
+    'PASSKEY_RP_ID': 'localhost',
+    'PASSKEY_RP_NAME': 'dj-rest-jwt demo',
+    'PASSKEY_RP_ORIGINS': ['http://localhost:3000', 'http://localhost:8000'],
 }
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

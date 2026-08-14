@@ -50,6 +50,7 @@ urlpatterns = [
     re_path(r'^dj-rest-jwt/', include('dj_rest_jwt.urls')),
     re_path(r'^dj-rest-jwt/registration/', include('dj_rest_jwt.registration.urls')),
     re_path(r'^dj-rest-jwt/', include('dj_rest_jwt.mfa.urls')),
+    re_path(r'^dj-rest-jwt/passkeys/', include('dj_rest_jwt.passkeys.urls')),
     re_path(r'^account/', include('allauth.urls')),
     re_path(r'^admin/', admin.site.urls),
     re_path(r'^accounts/profile/$', RedirectView.as_view(url='/', permanent=True), name='profile-redirect'),
