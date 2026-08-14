@@ -28,6 +28,14 @@
     </div>
   </div>
 
+  <!-- Honeypot: dj_rest_jwt's ENABLE_HONEYPOT is on by default and rejects
+       registrations where this field is filled in. Real users never see it;
+       bots that blindly fill every input trip it. -->
+  <div style="position:absolute; left:-9999px" aria-hidden="true">
+    <label for="website">Leave this field blank</label>
+    <input name="website" type="text" id="website" tabindex="-1" autocomplete="off">
+  </div>
+
   <div class="form-group">
     <div class="col-sm-offset-2 col-sm-10">
       <button type="submit" class="btn btn-default">Sign up</button>
