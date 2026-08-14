@@ -94,10 +94,13 @@ class LoginView(GenericAPIView):
                 'access': self.access_token,
             }
 
-            if not auth_httponly:
+            # Only omit the refresh token from the body if it's actually
+            # retrievable some other way (an httponly cookie) - otherwise,
+            # with the zero-config defaults (HTTPONLY on, no cookie name
+            # configured), the refresh token would end up nowhere at all.
+            if not auth_httponly or not api_settings.JWT_AUTH_REFRESH_COOKIE:
                 data['refresh'] = self.refresh_token
             else:
-                # Wasnt sure if the serializer needed this
                 data['refresh'] = ""
 
             if return_expiration_times:

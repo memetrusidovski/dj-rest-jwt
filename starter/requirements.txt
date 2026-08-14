@@ -1,5 +1,5 @@
 # Install the main package from the parent directory in editable mode
--e ..[with-social,demo]
+-e ..[with-social]
 
 # Demo-specific dependencies
 django>=5.0.0
