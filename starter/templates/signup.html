@@ -5,4 +5,11 @@
     <h3>Signup</h3><hr/>
     {% include "fragments/signup_form.html" %}
   </div>
+  <!-- Turnstile (or reCAPTCHA v3 / hCaptcha) is off by default - dj_rest_jwt's
+       ENABLE_CAPTCHA requires CAPTCHA_SITE_KEY/CAPTCHA_SECRET_KEY to be set.
+       To enable it here: load the widget script for your chosen
+       CAPTCHA_BACKEND (e.g. https://challenges.cloudflare.com/turnstile/v0/api.js
+       for Turnstile), render its widget with your CAPTCHA_SITE_KEY, and add a
+       hidden `captcha_token` input to signup_form.html that the widget fills in
+       on completion. -->
 {% endblock %}
