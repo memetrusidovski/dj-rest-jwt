@@ -1,12 +1,12 @@
-# dj-rest-auth Demo Architecture
+# dj-rest-jwt Demo Architecture
 
-This directory contains a complete demonstration of a modern Single Page Application (SPA) authentication flow using `dj-rest-auth`.
+This directory contains a complete demonstration of a modern Single Page Application (SPA) authentication flow using `dj-rest-jwt`.
 
 ## Overview
 
 The demo consists of two main components:
 
-1.  **Backend (`demo/backend`)**: A Django project using `dj-rest-auth`, `django-allauth`, and `djangorestframework-simplejwt`. It exposes REST APIs for registration, login, and Multi-Factor Authentication (MFA).
+1.  **Backend (`demo/backend`)**: A Django project using `dj-rest-jwt`, `django-allauth`, and `djangorestframework-simplejwt`. It exposes REST APIs for registration, login, and Multi-Factor Authentication (MFA).
 2.  **Frontend (`demo/spa-client`)**: A Next.js application that consumes the backend APIs. It demonstrates a complete user flow including registration, login, MFA setup (QR code), and MFA verification.
 
 ## Architecture Diagram
@@ -20,7 +20,7 @@ graph TD
         ApiClient[Axios Client]
     end
     subgraph Backend [Django API (Port 8000)]
-        DjRestAuth[dj-rest-auth]
+        DjRestAuth[dj-rest-jwt]
         AllAuth[django-allauth]
         MFA[MFA App]
         DB[(SQLite DB)]

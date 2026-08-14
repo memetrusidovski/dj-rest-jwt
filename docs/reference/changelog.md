@@ -1,15 +1,15 @@
 # Changelog
 
-All notable changes to dj-rest-auth are documented in this file.
+All notable changes to dj-rest-jwt are documented in this file.
 
-For the full release history, see [GitHub Releases](https://github.com/iMerica/dj-rest-auth/releases).
+For the full release history, see [GitHub Releases](https://github.com/iMerica/dj-rest-jwt/releases).
 
 ## Version 7.x
 
 ### 7.1.0
 
 - Latest stable release
-- See [GitHub Release](https://github.com/iMerica/dj-rest-auth/releases/tag/v7.1.0) for details
+- See [GitHub Release](https://github.com/iMerica/dj-rest-jwt/releases/tag/v7.1.0) for details
 
 ### 7.0.0
 
@@ -75,21 +75,21 @@ REST_AUTH = {
 
 **Breaking Changes:**
 
-- Renamed from `django-rest-auth` to `dj-rest-auth`
-- Package name changed: `rest_auth` → `dj_rest_auth`
+- Renamed from `django-rest-auth` to `dj-rest-jwt`
+- Package name changed: `rest_auth` → `dj_rest_jwt`
 
 **Migration from django-rest-auth:**
 
 1. Uninstall old package: `pip uninstall django-rest-auth`
-2. Install new package: `pip install dj-rest-auth`
-3. Update imports: `rest_auth` → `dj_rest_auth`
-4. Update INSTALLED_APPS: `'rest_auth'` → `'dj_rest_auth'`
+2. Install new package: `pip install dj-rest-jwt`
+3. Update imports: `rest_auth` → `dj_rest_jwt`
+4. Update INSTALLED_APPS: `'rest_auth'` → `'dj_rest_jwt'`
 
 ## Version 1.x
 
 ### 1.0.0
 
-- Initial release as dj-rest-auth (fork of django-rest-auth)
+- Initial release as dj-rest-jwt (fork of django-rest-auth)
 - Added JWT support via djangorestframework-simplejwt
 - Full Django 3.x support
 

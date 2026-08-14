@@ -1,7 +1,7 @@
 from django.urls import include, re_path
 from django.contrib import admin
 from django.views.generic import RedirectView, TemplateView
-from dj_rest_auth.mfa.views import MFALoginView
+from dj_rest_jwt.mfa.views import MFALoginView
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
@@ -46,10 +46,10 @@ urlpatterns = [
         TemplateView.as_view(template_name="password_reset_confirm.html"),
         name='password_reset_confirm'),
 
-    re_path(r'^dj-rest-auth/login/$', MFALoginView.as_view(), name='rest_login'),
-    re_path(r'^dj-rest-auth/', include('dj_rest_auth.urls')),
-    re_path(r'^dj-rest-auth/registration/', include('dj_rest_auth.registration.urls')),
-    re_path(r'^dj-rest-auth/', include('dj_rest_auth.mfa.urls')),
+    re_path(r'^dj-rest-jwt/login/$', MFALoginView.as_view(), name='rest_login'),
+    re_path(r'^dj-rest-jwt/', include('dj_rest_jwt.urls')),
+    re_path(r'^dj-rest-jwt/registration/', include('dj_rest_jwt.registration.urls')),
+    re_path(r'^dj-rest-jwt/', include('dj_rest_jwt.mfa.urls')),
     re_path(r'^account/', include('allauth.urls')),
     re_path(r'^admin/', admin.site.urls),
     re_path(r'^accounts/profile/$', RedirectView.as_view(url='/', permanent=True), name='profile-redirect'),

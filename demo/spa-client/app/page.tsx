@@ -11,7 +11,7 @@ export default function Home() {
 
   useEffect(() => {
     if (user) {
-      api.get('/dj-rest-auth/mfa/status/')
+      api.get('/dj-rest-jwt/mfa/status/')
         .then(res => setMfaStatus(res.data))
         .catch(err => console.error('Failed to fetch MFA status', err));
     }
@@ -22,7 +22,7 @@ export default function Home() {
   if (!user) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-24">
-        <h1 className="text-4xl font-bold mb-8">dj-rest-auth MFA Demo</h1>
+        <h1 className="text-4xl font-bold mb-8">dj-rest-jwt MFA Demo</h1>
         <div className="flex gap-4">
           <Link href="/login" className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Login</Link>
           <Link href="/register" className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">Register</Link>
@@ -61,7 +61,7 @@ export default function Home() {
                   Manage MFA (Not Implemented)
                 </Link>
                 <button
-                  onClick={() => alert('Disable MFA logic would go here (endpoint: /dj-rest-auth/mfa/totp/deactivate/)')}
+                  onClick={() => alert('Disable MFA logic would go here (endpoint: /dj-rest-jwt/mfa/totp/deactivate/)')}
                   className="block w-full text-center px-4 py-2 text-red-600 border border-red-200 rounded hover:bg-red-50"
                 >
                   Disable MFA

@@ -1,6 +1,6 @@
 # User Profiles & Common Patterns
 
-This guide covers common patterns and frequently asked questions when using dj-rest-auth.
+This guide covers common patterns and frequently asked questions when using dj-rest-jwt.
 
 ## Extending the User Model with a Profile
 
@@ -43,7 +43,7 @@ def save_user_profile(sender, instance, **kwargs):
 
 ```python title="serializers.py"
 from rest_framework import serializers
-from dj_rest_auth.serializers import UserDetailsSerializer
+from dj_rest_jwt.serializers import UserDetailsSerializer
 from .models import UserProfile
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -127,14 +127,14 @@ Or the verification URL doesn't work as expected for your SPA.
 
 ### The Solution
 
-The `account-confirm-email` URL is defined by dj-rest-auth but uses a placeholder view. You need to configure it for your use case.
+The `account-confirm-email` URL is defined by dj-rest-jwt but uses a placeholder view. You need to configure it for your use case.
 
 #### For SPAs (Recommended)
 
 ```python title="urls.py"
 from django.urls import path, re_path
 from django.views.generic import TemplateView
-from dj_rest_auth.registration.views import VerifyEmailView
+from dj_rest_jwt.registration.views import VerifyEmailView
 
 urlpatterns = [
     # ... other urls ...
@@ -208,7 +208,7 @@ urlpatterns = [
     ),
     
     # Other URLs
-    path('api/auth/', include('dj_rest_auth.urls')),
+    path('api/auth/', include('dj_rest_jwt.urls')),
 ]
 ```
 
@@ -226,7 +226,7 @@ PASSWORD_RESET_CONFIRM_URL = 'https://yourapp.com/reset-password/{uid}/{token}'
 Add extra fields to the registration form:
 
 ```python title="serializers.py"
-from dj_rest_auth.registration.serializers import RegisterSerializer
+from dj_rest_jwt.registration.serializers import RegisterSerializer
 from rest_framework import serializers
 
 class CustomRegisterSerializer(RegisterSerializer):
@@ -278,7 +278,7 @@ ACCOUNT_AUTHENTICATION_METHOD = 'email'
 For a better error message:
 
 ```python title="serializers.py"
-from dj_rest_auth.serializers import LoginSerializer
+from dj_rest_jwt.serializers import LoginSerializer
 from rest_framework import serializers
 
 class CustomLoginSerializer(LoginSerializer):
@@ -348,7 +348,7 @@ Handle different user types (e.g., customers vs. vendors):
 ### Using Groups
 
 ```python title="serializers.py"
-from dj_rest_auth.registration.serializers import RegisterSerializer
+from dj_rest_jwt.registration.serializers import RegisterSerializer
 from django.contrib.auth.models import Group
 
 class CustomerRegisterSerializer(RegisterSerializer):
@@ -376,7 +376,7 @@ class VendorRegisterSerializer(RegisterSerializer):
 ### Separate Endpoints
 
 ```python title="views.py"
-from dj_rest_auth.registration.views import RegisterView
+from dj_rest_jwt.registration.views import RegisterView
 from .serializers import CustomerRegisterSerializer, VendorRegisterSerializer
 
 class CustomerRegisterView(RegisterView):
@@ -405,14 +405,14 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.ScopedRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'dj_rest_auth': '100/hour',
+        'dj_rest_jwt': '100/hour',
         'login': '5/minute',
     },
 }
 ```
 
 ```python title="views.py"
-from dj_rest_auth.views import LoginView
+from dj_rest_jwt.views import LoginView
 
 class ThrottledLoginView(LoginView):
     throttle_scope = 'login'
@@ -423,6 +423,6 @@ from .views import ThrottledLoginView
 
 urlpatterns = [
     path('api/auth/login/', ThrottledLoginView.as_view(), name='rest_login'),
-    path('api/auth/', include('dj_rest_auth.urls')),
+    path('api/auth/', include('dj_rest_jwt.urls')),
 ]
 ```

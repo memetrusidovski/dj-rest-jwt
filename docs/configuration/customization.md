@@ -1,6 +1,6 @@
 # Customization
 
-dj-rest-auth is designed to be highly customizable. Every serializer can be overridden, and there are hooks for custom validation logic.
+dj-rest-jwt is designed to be highly customizable. Every serializer can be overridden, and there are hooks for custom validation logic.
 
 ## Overriding Serializers
 
@@ -11,7 +11,7 @@ All serializers can be replaced by setting the corresponding `REST_AUTH` setting
 Add extra validation or modify login behavior:
 
 ```python title="serializers.py"
-from dj_rest_auth.serializers import LoginSerializer
+from dj_rest_jwt.serializers import LoginSerializer
 from rest_framework import serializers
 
 class CustomLoginSerializer(LoginSerializer):
@@ -45,7 +45,7 @@ REST_AUTH = {
 Customize which fields are returned and editable:
 
 ```python title="serializers.py"
-from dj_rest_auth.serializers import UserDetailsSerializer
+from dj_rest_jwt.serializers import UserDetailsSerializer
 from rest_framework import serializers
 
 class CustomUserDetailsSerializer(UserDetailsSerializer):
@@ -92,7 +92,7 @@ REST_AUTH = {
 Add extra fields to registration:
 
 ```python title="serializers.py"
-from dj_rest_auth.registration.serializers import RegisterSerializer
+from dj_rest_jwt.registration.serializers import RegisterSerializer
 from rest_framework import serializers
 from allauth.account.adapter import get_adapter
 
@@ -208,7 +208,7 @@ REST_AUTH = {
 ### Password Change with Custom Validation
 
 ```python title="serializers.py"
-from dj_rest_auth.serializers import PasswordChangeSerializer
+from dj_rest_jwt.serializers import PasswordChangeSerializer
 from rest_framework import serializers
 
 class CustomPasswordChangeSerializer(PasswordChangeSerializer):
@@ -236,7 +236,7 @@ class CustomPasswordChangeSerializer(PasswordChangeSerializer):
 ### Password Reset with Custom Email
 
 ```python title="serializers.py"
-from dj_rest_auth.serializers import PasswordResetSerializer
+from dj_rest_jwt.serializers import PasswordResetSerializer
 
 class CustomPasswordResetSerializer(PasswordResetSerializer):
     def get_email_options(self):
@@ -258,7 +258,7 @@ class CustomPasswordResetSerializer(PasswordResetSerializer):
 For more control, you can subclass the views directly:
 
 ```python title="views.py"
-from dj_rest_auth.views import LoginView, LogoutView
+from dj_rest_jwt.views import LoginView, LogoutView
 from rest_framework.response import Response
 from rest_framework import status
 
@@ -303,7 +303,7 @@ from myapp.views import CustomLoginView, CustomLogoutView
 urlpatterns = [
     path('api/auth/login/', CustomLoginView.as_view(), name='rest_login'),
     path('api/auth/logout/', CustomLogoutView.as_view(), name='rest_logout'),
-    path('api/auth/', include('dj_rest_auth.urls')),  # Other endpoints
+    path('api/auth/', include('dj_rest_jwt.urls')),  # Other endpoints
 ]
 ```
 
@@ -339,7 +339,7 @@ def create_user_profile(sender, instance, created, **kwargs):
 
 ```python title="serializers.py"
 from rest_framework import serializers
-from dj_rest_auth.serializers import UserDetailsSerializer
+from dj_rest_jwt.serializers import UserDetailsSerializer
 from .models import UserProfile
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -380,7 +380,7 @@ REST_AUTH = {
 
 ## Throttling
 
-All dj-rest-auth views use the `dj_rest_auth` throttle scope. Configure rate limiting:
+All dj-rest-jwt views use the `dj_rest_jwt` throttle scope. Configure rate limiting:
 
 ```python title="settings.py"
 REST_FRAMEWORK = {
@@ -388,8 +388,8 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.ScopedRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'dj_rest_auth': '100/hour',
-        'dj_rest_auth_login': '10/minute',  # Stricter for login
+        'dj_rest_jwt': '100/hour',
+        'dj_rest_jwt_login': '10/minute',  # Stricter for login
     },
 }
 ```
@@ -397,8 +397,8 @@ REST_FRAMEWORK = {
 To use a custom throttle scope for specific views:
 
 ```python title="views.py"
-from dj_rest_auth.views import LoginView
+from dj_rest_jwt.views import LoginView
 
 class StrictLoginView(LoginView):
-    throttle_scope = 'dj_rest_auth_login'
+    throttle_scope = 'dj_rest_jwt_login'
 ```

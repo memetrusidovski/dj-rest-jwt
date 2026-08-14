@@ -1,19 +1,19 @@
-# dj-rest-auth
+# dj-rest-jwt
 
 <p style="font-size: 1.4em; color: var(--md-default-fg-color--light);">
 Drop-in authentication endpoints for Django REST Framework. Works seamlessly with SPAs and mobile apps.
 </p>
 
-[![CI](https://github.com/iMerica/dj-rest-auth/actions/workflows/main.yml/badge.svg)](https://github.com/iMerica/dj-rest-auth/actions/workflows/main.yml)
-[![PyPI](https://img.shields.io/pypi/v/dj-rest-auth)](https://pypi.org/project/dj-rest-auth/)
-[![Python](https://img.shields.io/badge/python-3.10--3.14-blue)](https://pypi.org/project/dj-rest-auth/)
-[![Django](https://img.shields.io/badge/django-4.2--6.0-green)](https://pypi.org/project/dj-rest-auth/)
+[![CI](https://github.com/iMerica/dj-rest-jwt/actions/workflows/main.yml/badge.svg)](https://github.com/iMerica/dj-rest-jwt/actions/workflows/main.yml)
+[![PyPI](https://img.shields.io/pypi/v/dj-rest-jwt)](https://pypi.org/project/dj-rest-jwt/)
+[![Python](https://img.shields.io/badge/python-3.10--3.14-blue)](https://pypi.org/project/dj-rest-jwt/)
+[![Django](https://img.shields.io/badge/django-4.2--6.0-green)](https://pypi.org/project/dj-rest-jwt/)
 
 ---
 
-## Why dj-rest-auth?
+## Why dj-rest-jwt?
 
-Building authentication for your API shouldn't require reinventing the wheel. **dj-rest-auth** provides a complete set of REST API endpoints for user authentication, registration, and account management—all following security best practices.
+Building authentication for your API shouldn't require reinventing the wheel. **dj-rest-jwt** provides a complete set of REST API endpoints for user authentication, registration, and account management—all following security best practices.
 
 <div class="grid cards" markdown>
 
@@ -87,7 +87,7 @@ INSTALLED_APPS = [
     # ...
     'rest_framework',
     'rest_framework.authtoken',
-    'dj_rest_auth',
+    'dj_rest_jwt',
 ]
 
 REST_AUTH = {
@@ -101,7 +101,7 @@ REST_AUTH = {
 from django.urls import path, include
 
 urlpatterns = [
-    path('api/auth/', include('dj_rest_auth.urls')),
+    path('api/auth/', include('dj_rest_jwt.urls')),
 ]
 ```
 
@@ -123,7 +123,7 @@ flowchart LR
         SPA[React / Vue / Mobile]
     end
     
-    subgraph djrestauth [dj-rest-auth]
+    subgraph djrestauth [dj-rest-jwt]
         Login[LoginView]
         Logout[LogoutView]
         User[UserDetailsView]
@@ -150,4 +150,4 @@ flowchart LR
 
 ## License
 
-MIT License - See [LICENSE](https://github.com/iMerica/dj-rest-auth/blob/master/LICENSE) for details.
+MIT License - See [LICENSE](https://github.com/iMerica/dj-rest-jwt/blob/master/LICENSE) for details.

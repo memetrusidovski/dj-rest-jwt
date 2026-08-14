@@ -1,6 +1,6 @@
 # API Endpoints
 
-Complete reference for all dj-rest-auth endpoints.
+Complete reference for all dj-rest-jwt endpoints.
 
 ## Authentication Endpoints
 
@@ -9,7 +9,7 @@ Complete reference for all dj-rest-auth endpoints.
 Authenticate a user and obtain a token or JWT.
 
 ```
-POST /dj-rest-auth/login/
+POST /dj-rest-jwt/login/
 ```
 
 **Request Body:**
@@ -87,7 +87,7 @@ POST /dj-rest-auth/login/
 Revoke the authentication token and/or clear JWT cookies.
 
 ```
-POST /dj-rest-auth/logout/
+POST /dj-rest-jwt/logout/
 ```
 
 **Request Headers:**
@@ -117,9 +117,9 @@ POST /dj-rest-auth/logout/
 Retrieve or update the authenticated user's information.
 
 ```
-GET /dj-rest-auth/user/
-PUT /dj-rest-auth/user/
-PATCH /dj-rest-auth/user/
+GET /dj-rest-jwt/user/
+PUT /dj-rest-jwt/user/
+PATCH /dj-rest-jwt/user/
 ```
 
 **Request Headers:**
@@ -160,7 +160,7 @@ PATCH /dj-rest-auth/user/
 Request a password reset email.
 
 ```
-POST /dj-rest-auth/password/reset/
+POST /dj-rest-jwt/password/reset/
 ```
 
 **Request Body:**
@@ -189,7 +189,7 @@ POST /dj-rest-auth/password/reset/
 Complete the password reset using the token from the email.
 
 ```
-POST /dj-rest-auth/password/reset/confirm/
+POST /dj-rest-jwt/password/reset/confirm/
 ```
 
 **Request Body:**
@@ -232,7 +232,7 @@ POST /dj-rest-auth/password/reset/confirm/
 Change password for authenticated user.
 
 ```
-POST /dj-rest-auth/password/change/
+POST /dj-rest-jwt/password/change/
 ```
 
 **Request Headers:**
@@ -273,7 +273,7 @@ These endpoints are only available when `USE_JWT = True`.
 Verify that a JWT token is valid.
 
 ```
-POST /dj-rest-auth/token/verify/
+POST /dj-rest-jwt/token/verify/
 ```
 
 **Request Body:**
@@ -303,7 +303,7 @@ POST /dj-rest-auth/token/verify/
 Obtain a new access token using a refresh token.
 
 ```
-POST /dj-rest-auth/token/refresh/
+POST /dj-rest-jwt/token/refresh/
 ```
 
 **Request Body:**
@@ -329,14 +329,14 @@ POST /dj-rest-auth/token/refresh/
 
 ## Registration Endpoints
 
-These endpoints require `dj_rest_auth.registration` in `INSTALLED_APPS`.
+These endpoints require `dj_rest_jwt.registration` in `INSTALLED_APPS`.
 
 ### Register
 
 Create a new user account.
 
 ```
-POST /dj-rest-auth/registration/
+POST /dj-rest-jwt/registration/
 ```
 
 **Request Body:**
@@ -394,7 +394,7 @@ POST /dj-rest-auth/registration/
 Verify user's email address using the key from verification email.
 
 ```
-POST /dj-rest-auth/registration/verify-email/
+POST /dj-rest-jwt/registration/verify-email/
 ```
 
 **Request Body:**
@@ -417,7 +417,7 @@ POST /dj-rest-auth/registration/verify-email/
     You need to configure the email verification URL in your frontend. Add this to your `urls.py`:
 
     ```python
-    from dj_rest_auth.registration.views import VerifyEmailView
+    from dj_rest_jwt.registration.views import VerifyEmailView
 
     urlpatterns = [
         # ...
@@ -436,7 +436,7 @@ POST /dj-rest-auth/registration/verify-email/
 Resend the email verification link.
 
 ```
-POST /dj-rest-auth/registration/resend-email/
+POST /dj-rest-jwt/registration/resend-email/
 ```
 
 **Request Body:**
@@ -466,7 +466,7 @@ See [Social Authentication Guide](../guides/social-auth.md) for setup instructio
 Authenticate using an OAuth provider.
 
 ```
-POST /dj-rest-auth/{provider}/
+POST /dj-rest-jwt/{provider}/
 ```
 
 **Request Body:**
@@ -489,45 +489,45 @@ See [MFA Guide](../guides/mfa.md) for setup, login flow, and endpoint contracts.
 ### MFA Verify
 
 ```
-POST /dj-rest-auth/mfa/verify/
+POST /dj-rest-jwt/mfa/verify/
 ```
 
 ### TOTP Activate
 
 ```
-GET /dj-rest-auth/mfa/totp/activate/
-POST /dj-rest-auth/mfa/totp/activate/
+GET /dj-rest-jwt/mfa/totp/activate/
+POST /dj-rest-jwt/mfa/totp/activate/
 ```
 
 ### TOTP Deactivate
 
 ```
-POST /dj-rest-auth/mfa/totp/deactivate/
+POST /dj-rest-jwt/mfa/totp/deactivate/
 ```
 
 ### MFA Status
 
 ```
-GET /dj-rest-auth/mfa/status/
+GET /dj-rest-jwt/mfa/status/
 ```
 
 ### Recovery Codes
 
 ```
-GET  /dj-rest-auth/mfa/recovery-codes/
-POST /dj-rest-auth/mfa/recovery-codes/regenerate/
+GET  /dj-rest-jwt/mfa/recovery-codes/
+POST /dj-rest-jwt/mfa/recovery-codes/regenerate/
 ```
 
 ---
 
 ## Passkey Endpoints
 
-These endpoints require `dj_rest_auth.passkeys` in `INSTALLED_APPS`. See [Passkeys Guide](../guides/passkeys.md) for setup and flow details.
+These endpoints require `dj_rest_jwt.passkeys` in `INSTALLED_APPS`. See [Passkeys Guide](../guides/passkeys.md) for setup and flow details.
 
 ### Passkey Register Begin
 
 ```
-POST /dj-rest-auth/passkeys/register/begin/
+POST /dj-rest-jwt/passkeys/register/begin/
 ```
 
 Authentication required. Returns WebAuthn `PublicKeyCredentialCreationOptions`.
@@ -535,7 +535,7 @@ Authentication required. Returns WebAuthn `PublicKeyCredentialCreationOptions`.
 ### Passkey Register Complete
 
 ```
-POST /dj-rest-auth/passkeys/register/complete/
+POST /dj-rest-jwt/passkeys/register/complete/
 ```
 
 Authentication required. Verifies and stores the credential (201 Created).
@@ -543,7 +543,7 @@ Authentication required. Verifies and stores the credential (201 Created).
 ### Passkey Login Begin
 
 ```
-POST /dj-rest-auth/passkeys/login/begin/
+POST /dj-rest-jwt/passkeys/login/begin/
 ```
 
 No authentication required. Returns WebAuthn `PublicKeyCredentialRequestOptions` + `session_id`.
@@ -551,7 +551,7 @@ No authentication required. Returns WebAuthn `PublicKeyCredentialRequestOptions`
 ### Passkey Login Complete
 
 ```
-POST /dj-rest-auth/passkeys/login/complete/
+POST /dj-rest-jwt/passkeys/login/complete/
 ```
 
 No authentication required. Verifies the assertion and returns a standard auth response.
@@ -559,7 +559,7 @@ No authentication required. Verifies the assertion and returns a standard auth r
 ### List Passkeys
 
 ```
-GET /dj-rest-auth/passkeys/
+GET /dj-rest-jwt/passkeys/
 ```
 
 Authentication required. Returns all passkeys for the authenticated user.
@@ -567,9 +567,9 @@ Authentication required. Returns all passkeys for the authenticated user.
 ### Passkey Detail
 
 ```
-GET    /dj-rest-auth/passkeys/{id}/
-PATCH  /dj-rest-auth/passkeys/{id}/
-DELETE /dj-rest-auth/passkeys/{id}/
+GET    /dj-rest-jwt/passkeys/{id}/
+PATCH  /dj-rest-jwt/passkeys/{id}/
+DELETE /dj-rest-jwt/passkeys/{id}/
 ```
 
 Authentication required. Retrieve, rename, or delete an individual passkey.
@@ -593,7 +593,7 @@ Authentication required. Retrieve, rename, or delete an individual passkey.
 
 ## Throttling
 
-All authentication views use the `dj_rest_auth` throttle scope. Configure in your settings:
+All authentication views use the `dj_rest_jwt` throttle scope. Configure in your settings:
 
 ```python
 REST_FRAMEWORK = {
@@ -601,7 +601,7 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.ScopedRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'dj_rest_auth': '100/hour',
+        'dj_rest_jwt': '100/hour',
     },
 }
 ```

@@ -1,6 +1,6 @@
 # Passkeys (WebAuthn)
 
-dj-rest-auth includes optional passkey support for passwordless authentication using the FIDO2/WebAuthn standard. Users can register hardware security keys or platform authenticators (Touch ID, Windows Hello, Android biometrics) and use them to log in without a password.
+dj-rest-jwt includes optional passkey support for passwordless authentication using the FIDO2/WebAuthn standard. Users can register hardware security keys or platform authenticators (Touch ID, Windows Hello, Android biometrics) and use them to log in without a password.
 
 ## Overview
 
@@ -15,7 +15,7 @@ dj-rest-auth includes optional passkey support for passwordless authentication u
 ### 1) Install passkey extras
 
 ```bash
-pip install 'dj-rest-auth[with-passkeys]'
+pip install 'dj-rest-jwt[with-passkeys]'
 ```
 
 `with-passkeys` installs the `webauthn` library.
@@ -27,8 +27,8 @@ INSTALLED_APPS = [
     # ...
     'rest_framework',
     'rest_framework.authtoken',
-    'dj_rest_auth',
-    'dj_rest_auth.passkeys',
+    'dj_rest_jwt',
+    'dj_rest_jwt.passkeys',
 ]
 ```
 
@@ -68,8 +68,8 @@ python manage.py migrate
 from django.urls import include, path
 
 urlpatterns = [
-    path('dj-rest-auth/', include('dj_rest_auth.urls')),
-    path('dj-rest-auth/passkeys/', include('dj_rest_auth.passkeys.urls')),
+    path('dj-rest-jwt/', include('dj_rest_jwt.urls')),
+    path('dj-rest-jwt/passkeys/', include('dj_rest_jwt.passkeys.urls')),
 ]
 ```
 
@@ -121,7 +121,7 @@ sequenceDiagram
 
 ### Register Begin
 
-`POST /dj-rest-auth/passkeys/register/begin/`
+`POST /dj-rest-jwt/passkeys/register/begin/`
 
 Authentication required.
 
@@ -133,7 +133,7 @@ Response: WebAuthn `PublicKeyCredentialCreationOptions` JSON.
 
 ### Register Complete
 
-`POST /dj-rest-auth/passkeys/register/complete/`
+`POST /dj-rest-jwt/passkeys/register/complete/`
 
 Authentication required.
 
@@ -146,7 +146,7 @@ Response (201): registered credential details.
 
 ### Login Begin
 
-`POST /dj-rest-auth/passkeys/login/begin/`
+`POST /dj-rest-jwt/passkeys/login/begin/`
 
 No authentication required.
 
@@ -159,7 +159,7 @@ Response: WebAuthn `PublicKeyCredentialRequestOptions` JSON + `session_id`.
 
 ### Login Complete
 
-`POST /dj-rest-auth/passkeys/login/complete/`
+`POST /dj-rest-jwt/passkeys/login/complete/`
 
 No authentication required.
 
@@ -172,7 +172,7 @@ Response: standard auth response (same as login — token key, JWT, or session).
 
 ### List Passkeys
 
-`GET /dj-rest-auth/passkeys/`
+`GET /dj-rest-jwt/passkeys/`
 
 Authentication required. Returns all passkeys for the authenticated user, ordered by creation date (newest first).
 
@@ -183,9 +183,9 @@ Response fields per credential:
 ### Passkey Detail
 
 ```
-GET    /dj-rest-auth/passkeys/{id}/
-PATCH  /dj-rest-auth/passkeys/{id}/
-DELETE /dj-rest-auth/passkeys/{id}/
+GET    /dj-rest-jwt/passkeys/{id}/
+PATCH  /dj-rest-jwt/passkeys/{id}/
+DELETE /dj-rest-jwt/passkeys/{id}/
 ```
 
 Authentication required. Users can only access their own credentials.

@@ -21,9 +21,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r dj_rest_auth/tests/requirements.txt
+          pip install -r dj_rest_jwt/tests/requirements.txt
       - name: Lint
-        run: flake8 dj_rest_auth/
+        run: flake8 dj_rest_jwt/
   build:
     runs-on: ubuntu-latest
     name: Build
@@ -76,7 +76,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          pip install -r dj_rest_auth/tests/requirements.txt
+          pip install -r dj_rest_jwt/tests/requirements.txt
           pip install "Django~=${{ matrix.django-version }}.0"
       - name: Run Tests
         run: |

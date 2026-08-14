@@ -18,7 +18,7 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
-pip install django djangorestframework dj-rest-auth
+pip install django djangorestframework dj-rest-jwt
 
 # Create Django project
 django-admin startproject config .
@@ -40,7 +40,7 @@ INSTALLED_APPS = [
     # Add these
     'rest_framework',
     'rest_framework.authtoken',
-    'dj_rest_auth',
+    'dj_rest_jwt',
 ]
 
 # Add at the bottom
@@ -61,7 +61,7 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/auth/', include('dj_rest_auth.urls')),
+    path('api/auth/', include('dj_rest_jwt.urls')),
 ]
 ```
 
@@ -207,7 +207,7 @@ pip install djangorestframework-simplejwt
 ```python title="config/settings.py"
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'dj_rest_auth.jwt_auth.JWTCookieAuthentication',
+        'dj_rest_jwt.jwt_auth.JWTCookieAuthentication',
     ],
 }
 
@@ -259,7 +259,7 @@ curl http://localhost:8000/api/auth/user/ -b cookies.txt
 ### 1. Install allauth
 
 ```bash
-pip install 'dj-rest-auth[with-social]'
+pip install 'dj-rest-jwt[with-social]'
 ```
 
 ### 2. Update Settings
@@ -270,7 +270,7 @@ INSTALLED_APPS = [
     'django.contrib.sites',
     'allauth',
     'allauth.account',
-    'dj_rest_auth.registration',
+    'dj_rest_jwt.registration',
 ]
 
 MIDDLEWARE = [
@@ -289,8 +289,8 @@ ACCOUNT_EMAIL_VERIFICATION = 'none'  # Change to 'mandatory' for production
 ```python title="config/urls.py"
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/auth/', include('dj_rest_auth.urls')),
-    path('api/auth/registration/', include('dj_rest_auth.registration.urls')),
+    path('api/auth/', include('dj_rest_jwt.urls')),
+    path('api/auth/registration/', include('dj_rest_jwt.registration.urls')),
 ]
 ```
 

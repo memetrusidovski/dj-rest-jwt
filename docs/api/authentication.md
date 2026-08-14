@@ -1,6 +1,6 @@
 # Authentication Methods
 
-dj-rest-auth supports multiple authentication methods. This guide explains how each works and when to use them.
+dj-rest-jwt supports multiple authentication methods. This guide explains how each works and when to use them.
 
 ## Overview
 
@@ -42,7 +42,7 @@ The simplest method. Django REST Framework's built-in token auth.
 ```mermaid
 sequenceDiagram
     participant Client
-    participant API as dj-rest-auth
+    participant API as dj-rest-jwt
     participant DB as Database
     
     Client->>API: POST /login/ {credentials}
@@ -66,7 +66,7 @@ sequenceDiagram
 INSTALLED_APPS = [
     # ...
     'rest_framework.authtoken',
-    'dj_rest_auth',
+    'dj_rest_jwt',
 ]
 
 REST_FRAMEWORK = {
@@ -110,7 +110,7 @@ JSON Web Tokens with optional HTTP-only cookie storage. Recommended for SPAs.
 ```mermaid
 sequenceDiagram
     participant Browser as Browser/SPA
-    participant API as dj-rest-auth
+    participant API as dj-rest-jwt
     participant JWT as SimpleJWT
     
     Browser->>API: POST /login/ {credentials}
@@ -143,12 +143,12 @@ INSTALLED_APPS = [
     # ...
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',  # For logout
-    'dj_rest_auth',
+    'dj_rest_jwt',
 ]
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'dj_rest_auth.jwt_auth.JWTCookieAuthentication',
+        'dj_rest_jwt.jwt_auth.JWTCookieAuthentication',
     ],
 }
 
@@ -171,7 +171,7 @@ SIMPLE_JWT = {
 
 ### Cookie vs Bearer
 
-dj-rest-auth supports both cookie-based and header-based JWT authentication simultaneously.
+dj-rest-jwt supports both cookie-based and header-based JWT authentication simultaneously.
 
 === "Cookie (Recommended for SPAs)"
 
@@ -232,7 +232,7 @@ Django's built-in session authentication. Best for traditional server-rendered a
 ```mermaid
 sequenceDiagram
     participant Browser
-    participant API as dj-rest-auth
+    participant API as dj-rest-jwt
     participant Session as Session Store
     
     Browser->>API: POST /login/ {credentials}
@@ -280,7 +280,7 @@ You can enable multiple authentication methods:
 ```python title="settings.py"
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'dj_rest_auth.jwt_auth.JWTCookieAuthentication',  # JWT cookies
+        'dj_rest_jwt.jwt_auth.JWTCookieAuthentication',  # JWT cookies
         'rest_framework.authentication.TokenAuthentication',  # Token header
         'rest_framework.authentication.SessionAuthentication',  # Session
     ],
@@ -329,7 +329,7 @@ REST_AUTH = {
 
 ### Password Hashing
 
-dj-rest-auth uses Django's password hashing system. Ensure you have strong hashers configured:
+dj-rest-jwt uses Django's password hashing system. Ensure you have strong hashers configured:
 
 ```python title="settings.py"
 PASSWORD_HASHERS = [

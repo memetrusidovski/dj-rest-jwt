@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const checkAuth = async () => {
     try {
-      const response = await api.get('/dj-rest-auth/user/');
+      const response = await api.get('/dj-rest-jwt/user/');
       setUser(response.data);
     } catch (error) {
       setUser(null);
@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const login = async (data: any) => {
     try {
-      const response = await api.post('/dj-rest-auth/login/', data);
+      const response = await api.post('/dj-rest-jwt/login/', data);
       if (response.data.mfa_required) {
         router.push(`/mfa/verify?token=${response.data.ephemeral_token}`);
         return;
@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const verifyMfa = async (code: string, ephemeralToken: string) => {
     try {
-      const response = await api.post('/dj-rest-auth/mfa/verify/', {
+      const response = await api.post('/dj-rest-jwt/mfa/verify/', {
         code,
         ephemeral_token: ephemeralToken,
       });
@@ -82,7 +82,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     try {
-      await api.post('/dj-rest-auth/logout/');
+      await api.post('/dj-rest-jwt/logout/');
     } catch (error) {
       console.error('Logout failed', error);
     } finally {
@@ -94,7 +94,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const register = async (data: any) => {
     try {
-      const response = await api.post('/dj-rest-auth/registration/', data);
+      const response = await api.post('/dj-rest-jwt/registration/', data);
       if (response.data.key) {
         setCookie('auth_token', response.data.key);
         await checkAuth();

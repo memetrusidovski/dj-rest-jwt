@@ -1,13 +1,13 @@
 # Installation
 
-This guide covers all installation scenarios for dj-rest-auth.
+This guide covers all installation scenarios for dj-rest-jwt.
 
 ## Basic Installation
 
 ### 1. Install the package
 
 ```bash
-pip install dj-rest-auth
+pip install dj-rest-jwt
 ```
 
 ### 2. Add to installed apps
@@ -23,13 +23,13 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     
-    # dj-rest-auth
-    'dj_rest_auth',
+    # dj-rest-jwt
+    'dj_rest_jwt',
 ]
 ```
 
 !!! note "Dependencies"
-    dj-rest-auth requires Django REST Framework. Make sure both `rest_framework` and `rest_framework.authtoken` are in your `INSTALLED_APPS`.
+    dj-rest-jwt requires Django REST Framework. Make sure both `rest_framework` and `rest_framework.authtoken` are in your `INSTALLED_APPS`.
 
 ### 3. Add URL patterns
 
@@ -38,7 +38,7 @@ from django.urls import path, include
 
 urlpatterns = [
     # ...
-    path('api/auth/', include('dj_rest_auth.urls')),
+    path('api/auth/', include('dj_rest_jwt.urls')),
 ]
 ```
 
@@ -68,7 +68,7 @@ To enable user registration with email verification, you need django-allauth.
 ### 1. Install with social extras
 
 ```bash
-pip install 'dj-rest-auth[with-social]'
+pip install 'dj-rest-jwt[with-social]'
 ```
 
 This installs django-allauth as a dependency.
@@ -92,9 +92,9 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',  # Only if using social auth
     
-    # dj-rest-auth
-    'dj_rest_auth',
-    'dj_rest_auth.registration',
+    # dj-rest-jwt
+    'dj_rest_jwt',
+    'dj_rest_jwt.registration',
 ]
 
 # Required by django-allauth
@@ -120,8 +120,8 @@ from django.urls import path, include
 
 urlpatterns = [
     # ...
-    path('api/auth/', include('dj_rest_auth.urls')),
-    path('api/auth/registration/', include('dj_rest_auth.registration.urls')),
+    path('api/auth/', include('dj_rest_jwt.urls')),
+    path('api/auth/registration/', include('dj_rest_jwt.registration.urls')),
 ]
 ```
 
@@ -143,7 +143,7 @@ You now have additional endpoints:
 
 ## JWT Authentication (Optional)
 
-By default, dj-rest-auth uses Django REST Framework's token authentication. For JWT support with HTTP-only cookies (recommended for SPAs), follow these steps.
+By default, dj-rest-jwt uses Django REST Framework's token authentication. For JWT support with HTTP-only cookies (recommended for SPAs), follow these steps.
 
 ### 1. Install SimpleJWT
 
@@ -156,12 +156,12 @@ pip install djangorestframework-simplejwt
 ```python title="settings.py"
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'dj_rest_auth.jwt_auth.JWTCookieAuthentication',
+        'dj_rest_jwt.jwt_auth.JWTCookieAuthentication',
     ],
 }
 ```
 
-### 3. Enable JWT in dj-rest-auth
+### 3. Enable JWT in dj-rest-jwt
 
 ```python title="settings.py"
 REST_AUTH = {
@@ -206,7 +206,7 @@ To enable passwordless authentication with passkeys (Touch ID, Windows Hello, ha
 ### 1. Install with passkey extras
 
 ```bash
-pip install 'dj-rest-auth[with-passkeys]'
+pip install 'dj-rest-jwt[with-passkeys]'
 ```
 
 ### 2. Configure installed apps
@@ -216,8 +216,8 @@ INSTALLED_APPS = [
     # ...
     'rest_framework',
     'rest_framework.authtoken',
-    'dj_rest_auth',
-    'dj_rest_auth.passkeys',
+    'dj_rest_jwt',
+    'dj_rest_jwt.passkeys',
 ]
 ```
 
@@ -238,8 +238,8 @@ from django.urls import path, include
 
 urlpatterns = [
     # ...
-    path('api/auth/', include('dj_rest_auth.urls')),
-    path('api/auth/passkeys/', include('dj_rest_auth.passkeys.urls')),
+    path('api/auth/', include('dj_rest_jwt.urls')),
+    path('api/auth/passkeys/', include('dj_rest_jwt.passkeys.urls')),
 ]
 ```
 
@@ -291,9 +291,9 @@ INSTALLED_APPS = [
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
     
-    # dj-rest-auth
-    'dj_rest_auth',
-    'dj_rest_auth.registration',
+    # dj-rest-jwt
+    'dj_rest_jwt',
+    'dj_rest_jwt.registration',
 ]
 
 MIDDLEWARE = [
@@ -311,7 +311,7 @@ SITE_ID = 1
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'dj_rest_auth.jwt_auth.JWTCookieAuthentication',
+        'dj_rest_jwt.jwt_auth.JWTCookieAuthentication',
     ],
 }
 
@@ -345,8 +345,8 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/auth/', include('dj_rest_auth.urls')),
-    path('api/auth/registration/', include('dj_rest_auth.registration.urls')),
+    path('api/auth/', include('dj_rest_jwt.urls')),
+    path('api/auth/registration/', include('dj_rest_jwt.registration.urls')),
 ]
 ```
 

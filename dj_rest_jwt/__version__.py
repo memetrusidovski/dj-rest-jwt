@@ -1,0 +1,8 @@
+__title__ = 'dj-rest-jwt'
+__description__ = 'JWT-first, production-ready authentication for Django REST Framework.'
+__url__ = 'http://github.com/memetrusidovski/dj-rest-jwt'
+__version__ = '0.1.0'
+__author__ = '@memetrusidovski https://github.com/memetrusidovski'
+__author_email__ = ''
+__license__ = 'MIT'
+__copyright__ = 'Copyright 2026 @memetrusidovski https://github.com/memetrusidovski'
