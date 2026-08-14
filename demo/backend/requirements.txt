@@ -8,4 +8,6 @@ coreapi==2.3.3
 setuptools==78.1.1
 qrcode==8.2
 pyotp==2.9.0
+webauthn>=2.0.0
+fido2>=1.1.2
 ../../
