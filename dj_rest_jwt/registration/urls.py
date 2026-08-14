@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.urls import path, re_path
 from django.views.generic import TemplateView
 
@@ -29,3 +30,21 @@ urlpatterns = [
         name='account_email_verification_sent',
     ),
 ]
+
+if 'allauth.socialaccount' in settings.INSTALLED_APPS:
+    from .social_views import (
+        GitHubConnect, GitHubLogin, GoogleConnect, GoogleLogin,
+        MicrosoftConnect, MicrosoftLogin,
+    )
+
+    # Named rest_<provider>_* (not e.g. "google_login") to avoid colliding with
+    # allauth's own browser-redirect OAuth views, which register url names like
+    # "google_login" for /accounts/google/login/ when allauth.urls is included.
+    urlpatterns += [
+        re_path(r'google/login/?$', GoogleLogin.as_view(), name='rest_google_login'),
+        re_path(r'google/connect/?$', GoogleConnect.as_view(), name='rest_google_connect'),
+        re_path(r'github/login/?$', GitHubLogin.as_view(), name='rest_github_login'),
+        re_path(r'github/connect/?$', GitHubConnect.as_view(), name='rest_github_connect'),
+        re_path(r'microsoft/login/?$', MicrosoftLogin.as_view(), name='rest_microsoft_login'),
+        re_path(r'microsoft/connect/?$', MicrosoftConnect.as_view(), name='rest_microsoft_connect'),
+    ]
