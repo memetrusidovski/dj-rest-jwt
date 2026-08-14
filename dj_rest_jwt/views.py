@@ -15,6 +15,9 @@ from rest_framework.views import APIView
 
 from .app_settings import api_settings
 from .models import get_token_model
+from .throttling import (
+    LoginRateThrottle, PasswordResetRateThrottle, SensitiveAccountActionRateThrottle,
+)
 from .utils import jwt_encode
 
 
@@ -37,7 +40,7 @@ class LoginView(GenericAPIView):
     """
     permission_classes = (AllowAny,)
     serializer_class = api_settings.LOGIN_SERIALIZER
-    throttle_scope = 'dj_rest_jwt'
+    throttle_classes = (LoginRateThrottle,)
 
     user = None
     access_token = None
@@ -136,7 +139,7 @@ class LogoutView(APIView):
     Accepts/Returns nothing.
     """
     permission_classes = (AllowAny,)
-    throttle_scope = 'dj_rest_jwt'
+    throttle_classes = (SensitiveAccountActionRateThrottle,)
 
     def get(self, request, *args, **kwargs):
         if getattr(settings, 'ACCOUNT_LOGOUT_ON_GET', False):
@@ -249,7 +252,7 @@ class PasswordResetView(GenericAPIView):
     """
     serializer_class = api_settings.PASSWORD_RESET_SERIALIZER
     permission_classes = (AllowAny,)
-    throttle_scope = 'dj_rest_jwt'
+    throttle_classes = (PasswordResetRateThrottle,)
 
     def post(self, request, *args, **kwargs):
         # Create a serializer with request.data
@@ -275,7 +278,7 @@ class PasswordResetConfirmView(GenericAPIView):
     """
     serializer_class = api_settings.PASSWORD_RESET_CONFIRM_SERIALIZER
     permission_classes = (AllowAny,)
-    throttle_scope = 'dj_rest_jwt'
+    throttle_classes = (PasswordResetRateThrottle,)
 
     @sensitive_post_parameters_m
     def dispatch(self, *args, **kwargs):
@@ -299,7 +302,7 @@ class PasswordChangeView(GenericAPIView):
     """
     serializer_class = api_settings.PASSWORD_CHANGE_SERIALIZER
     permission_classes = (IsAuthenticated,)
-    throttle_scope = 'dj_rest_jwt'
+    throttle_classes = (SensitiveAccountActionRateThrottle,)
 
     @sensitive_post_parameters_m
     def dispatch(self, *args, **kwargs):

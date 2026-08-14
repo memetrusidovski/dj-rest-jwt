@@ -30,6 +30,7 @@ setup(
     install_requires=[
         'Django>=4.2',
         'djangorestframework>=3.13.0',
+        'djangorestframework-simplejwt>=5.3.0',
     ],
     extras_require={
         'with-social': ['django-allauth[socialaccount]>=64.0.0'],

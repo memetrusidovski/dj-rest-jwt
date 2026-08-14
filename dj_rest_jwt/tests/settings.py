@@ -112,6 +112,22 @@ AUTHENTICATION_BACKENDS = (
 )
 
 REST_AUTH = {
+    # Pinned explicitly: the package now defaults to TOKEN_MODEL=None/USE_JWT=True/
+    # SESSION_LOGIN=False (JWT-only, zero-config). This suite exercises the token+session
+    # code paths by default and opts into JWT per-test via @override_api_settings(USE_JWT=True),
+    # so it needs the classic settings pinned rather than inheriting the new defaults.
+    'TOKEN_MODEL': 'rest_framework.authtoken.models.Token',
+    'SESSION_LOGIN': True,
+    'USE_JWT': False,
+
+    # Rate limiting is disabled ambiently so existing tests (many of which log in
+    # repeatedly within a single test) aren't cross-polluted by the shared test
+    # cache. It's exercised explicitly in test_throttling.py via override_api_settings.
+    'RATE_LIMIT_LOGIN': None,
+    'RATE_LIMIT_REGISTER': None,
+    'RATE_LIMIT_PASSWORD_RESET': None,
+    'RATE_LIMIT_SENSITIVE_ACTION': None,
+
     'PASSKEY_RP_ID': 'localhost',
     'PASSKEY_RP_NAME': 'Test App',
     'PASSKEY_RP_ORIGINS': ['http://localhost:8000'],

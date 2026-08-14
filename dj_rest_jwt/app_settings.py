@@ -20,14 +20,14 @@ DEFAULTS = {
 
     'REGISTER_PERMISSION_CLASSES': ('rest_framework.permissions.AllowAny',),
 
-    'TOKEN_MODEL': 'rest_framework.authtoken.models.Token',
+    'TOKEN_MODEL': None,
     'TOKEN_CREATOR': 'dj_rest_jwt.utils.default_create_token',
 
     'PASSWORD_RESET_USE_SITES_DOMAIN': False,
     'OLD_PASSWORD_FIELD_ENABLED': False,
     'LOGOUT_ON_PASSWORD_CHANGE': False,
-    'SESSION_LOGIN': True,
-    'USE_JWT': False,
+    'SESSION_LOGIN': False,
+    'USE_JWT': True,
 
     'JWT_AUTH_COOKIE': None,
     'JWT_AUTH_REFRESH_COOKIE': None,
@@ -39,6 +39,13 @@ DEFAULTS = {
     'JWT_AUTH_RETURN_EXPIRATION': False,
     'JWT_AUTH_COOKIE_USE_CSRF': False,
     'JWT_AUTH_COOKIE_ENFORCE_CSRF_ON_UNAUTHENTICATED': False,
+
+    # Rate limiting - active out of the box, no REST_FRAMEWORK throttle config needed.
+    # Set any of these to None to disable throttling for that endpoint.
+    'RATE_LIMIT_LOGIN': '10/min',
+    'RATE_LIMIT_REGISTER': '20/hour',
+    'RATE_LIMIT_PASSWORD_RESET': '5/hour',
+    'RATE_LIMIT_SENSITIVE_ACTION': '30/hour',
 
     # MFA settings — only active when dj_rest_jwt.mfa is in INSTALLED_APPS
     'MFA_VERIFY_SERIALIZER': 'dj_rest_jwt.mfa.serializers.MFAVerifySerializer',
