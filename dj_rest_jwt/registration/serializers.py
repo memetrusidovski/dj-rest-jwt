@@ -9,6 +9,8 @@ from requests.exceptions import HTTPError
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
+from dj_rest_jwt.captcha import CaptchaSerializerMixin, HoneypotSerializerMixin
+
 try:
     from allauth.account import app_settings as allauth_account_settings
     from allauth.account.adapter import get_adapter
@@ -230,7 +232,7 @@ class SocialConnectSerializer(SocialConnectMixin, SocialLoginSerializer):
     pass
 
 
-class RegisterSerializer(serializers.Serializer):
+class RegisterSerializer(CaptchaSerializerMixin, HoneypotSerializerMixin, serializers.Serializer):
     username = serializers.CharField(
         max_length=get_username_max_length(),
         min_length=allauth_account_settings.USERNAME_MIN_LENGTH,
@@ -257,6 +259,7 @@ class RegisterSerializer(serializers.Serializer):
         return get_adapter().clean_password(password)
 
     def validate(self, data):
+        data = super().validate(data)
         if data['password1'] != data['password2']:
             raise serializers.ValidationError(_("The two password fields didn't match."))
         return data

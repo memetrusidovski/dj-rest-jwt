@@ -47,6 +47,19 @@ DEFAULTS = {
     'RATE_LIMIT_PASSWORD_RESET': '5/hour',
     'RATE_LIMIT_SENSITIVE_ACTION': '30/hour',
 
+    # Anti-spam - off by default (needs API keys to function); enable and set
+    # CAPTCHA_SITE_KEY/CAPTCHA_SECRET_KEY to turn on. Turnstile is the default
+    # backend when enabled: privacy-friendly and usually invisible to the user.
+    'ENABLE_CAPTCHA': False,
+    'CAPTCHA_BACKEND': 'turnstile',  # 'turnstile' | 'recaptcha_v3' | 'hcaptcha'
+    'CAPTCHA_SITE_KEY': None,
+    'CAPTCHA_SECRET_KEY': None,
+    'CAPTCHA_RECAPTCHA_V3_MIN_SCORE': 0.5,
+
+    # Honeypot field - free, no external dependency, on by default.
+    'ENABLE_HONEYPOT': True,
+    'HONEYPOT_FIELD_NAME': 'website',
+
     # MFA settings — only active when dj_rest_jwt.mfa is in INSTALLED_APPS
     'MFA_VERIFY_SERIALIZER': 'dj_rest_jwt.mfa.serializers.MFAVerifySerializer',
     'MFA_TOTP_ACTIVATE_INIT_SERIALIZER': 'dj_rest_jwt.mfa.serializers.TOTPActivateInitSerializer',
