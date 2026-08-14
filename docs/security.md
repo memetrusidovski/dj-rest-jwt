@@ -62,7 +62,7 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.ScopedRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'dj_rest_auth': '100/hour',
+        'dj_rest_jwt': '100/hour',
     },
 }
 ```
@@ -120,10 +120,10 @@ CORS_ALLOW_CREDENTIALS = True
 
 ## Security Updates
 
-Security updates are released as patch versions. Always keep dj-rest-auth updated:
+Security updates are released as patch versions. Always keep dj-rest-jwt updated:
 
 ```bash
-pip install --upgrade dj-rest-auth
+pip install --upgrade dj-rest-jwt
 ```
 
-Subscribe to [GitHub releases](https://github.com/iMerica/dj-rest-auth/releases) for security announcements.
+Subscribe to [GitHub releases](https://github.com/iMerica/dj-rest-jwt/releases) for security announcements.

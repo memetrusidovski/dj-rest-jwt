@@ -1,8 +1,8 @@
-site_name: dj-rest-auth
+site_name: dj-rest-jwt
 site_description: Authentication and Registration for Django REST Framework
-site_url: https://dj-rest-auth.readthedocs.io/
-repo_url: https://github.com/iMerica/dj-rest-auth
-repo_name: iMerica/dj-rest-auth
+site_url: https://dj-rest-jwt.readthedocs.io/
+repo_url: https://github.com/iMerica/dj-rest-jwt
+repo_name: iMerica/dj-rest-jwt
 edit_uri: edit/master/docs/
 
 theme:
@@ -44,9 +44,9 @@ theme:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/iMerica/dj-rest-auth
+      link: https://github.com/iMerica/dj-rest-jwt
     - icon: fontawesome/brands/python
-      link: https://pypi.org/project/dj-rest-auth/
+      link: https://pypi.org/project/dj-rest-jwt/
 
 copyright: Copyright &copy; 2020-2026 iMerica
 

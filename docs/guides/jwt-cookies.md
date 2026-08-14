@@ -27,7 +27,7 @@ Traditional approaches to SPA authentication have security tradeoffs:
 ### 1. Install Dependencies
 
 ```bash
-pip install dj-rest-auth djangorestframework-simplejwt
+pip install dj-rest-jwt djangorestframework-simplejwt
 ```
 
 ### 2. Configure Django Settings
@@ -40,12 +40,12 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',  # For logout
-    'dj_rest_auth',
+    'dj_rest_jwt',
 ]
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'dj_rest_auth.jwt_auth.JWTCookieAuthentication',
+        'dj_rest_jwt.jwt_auth.JWTCookieAuthentication',
     ],
 }
 

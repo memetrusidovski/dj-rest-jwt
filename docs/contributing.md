@@ -1,14 +1,14 @@
 # Contributing
 
-Thank you for your interest in contributing to dj-rest-auth!
+Thank you for your interest in contributing to dj-rest-jwt!
 
 ## Development Setup
 
 ### 1. Fork and Clone
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/dj-rest-auth.git
-cd dj-rest-auth
+git clone https://github.com/YOUR_USERNAME/dj-rest-jwt.git
+cd dj-rest-jwt
 ```
 
 ### 2. Create a Virtual Environment
@@ -22,7 +22,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 ```bash
 pip install -e .
-pip install -r dj_rest_auth/tests/requirements.txt
+pip install -r dj_rest_jwt/tests/requirements.txt
 ```
 
 ### 4. Run Tests
@@ -44,8 +44,8 @@ python runtests.py
 ### Single Test
 
 ```bash
-DJANGO_SETTINGS_MODULE=dj_rest_auth.tests.settings \
-  python -m django test dj_rest_auth.tests.test_api.APIBasicTests.test_login
+DJANGO_SETTINGS_MODULE=dj_rest_jwt.tests.settings \
+  python -m django test dj_rest_jwt.tests.test_api.APIBasicTests.test_login
 ```
 
 ### With Coverage
@@ -76,7 +76,7 @@ We use flake8 for linting with a max line length of 120 characters.
 ### Check Style
 
 ```bash
-flake8 dj_rest_auth/
+flake8 dj_rest_jwt/
 ```
 
 ### Run with Tox
@@ -110,7 +110,7 @@ git checkout -b feature/your-feature-name
 
 ```bash
 python runtests.py
-flake8 dj_rest_auth/
+flake8 dj_rest_jwt/
 ```
 
 ### 4. Commit Your Changes
@@ -174,7 +174,7 @@ mkdocs build
 ### Bug Reports
 
 Include:
-- dj-rest-auth version
+- dj-rest-jwt version
 - Python version
 - Django version
 - Steps to reproduce
@@ -206,4 +206,4 @@ From the maintainer:
 
 ## Questions?
 
-Open a [GitHub Discussion](https://github.com/iMerica/dj-rest-auth/discussions) for questions that aren't bugs or feature requests.
+Open a [GitHub Discussion](https://github.com/iMerica/dj-rest-jwt/discussions) for questions that aren't bugs or feature requests.

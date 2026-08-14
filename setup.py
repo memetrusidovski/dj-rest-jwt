@@ -11,16 +11,16 @@ f.close()
 
 
 about = {}
-with open('dj_rest_auth/__version__.py', 'r', encoding="utf8") as f:
+with open('dj_rest_jwt/__version__.py', 'r', encoding="utf8") as f:
     exec(f.read(), about)
 
 setup(
-    name='dj-rest-auth',
+    name='dj-rest-jwt',
     version=about['__version__'],
-    author='iMerica',
-    author_email='imichael@pm.me',
-    url='https://github.com/iMerica/dj-rest-auth',
-    description='Authentication and Registration in Django Rest Framework',
+    author='memetrusidovski',
+    author_email='',
+    url='https://github.com/memetrusidovski/dj-rest-jwt',
+    description='JWT-first, production-ready authentication for Django REST Framework',
     license='MIT',
     packages=find_packages(),
     long_description=long_description,

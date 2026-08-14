@@ -22,8 +22,8 @@ export default function MfaSetupPage() {
   useEffect(() => {
     const fetchSetupData = async () => {
       try {
-        // Updated URL based on my previous analysis of dj-rest-auth mfa urls
-        const response = await api.get('/dj-rest-auth/mfa/totp/activate/');
+        // Updated URL based on my previous analysis of dj-rest-jwt mfa urls
+        const response = await api.get('/dj-rest-jwt/mfa/totp/activate/');
         setSetupData(response.data);
       } catch (err) {
         console.error('Failed to load MFA setup data', err);
@@ -38,7 +38,7 @@ export default function MfaSetupPage() {
     if (!setupData) return;
 
     try {
-      await api.post('/dj-rest-auth/mfa/totp/activate/', {
+      await api.post('/dj-rest-jwt/mfa/totp/activate/', {
         activation_token: setupData.activation_token,
         code: code
       });

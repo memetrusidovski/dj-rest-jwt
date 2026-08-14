@@ -1,6 +1,6 @@
 # Upgrade Guide
 
-This guide helps you upgrade between major versions of dj-rest-auth.
+This guide helps you upgrade between major versions of dj-rest-jwt.
 
 ## Upgrading to 7.x
 
@@ -14,7 +14,7 @@ This guide helps you upgrade between major versions of dj-rest-auth.
 
 1. Update your Python version if needed
 2. Update Django: `pip install 'Django>=4.2'`
-3. Update dj-rest-auth: `pip install 'dj-rest-auth>=7.0'`
+3. Update dj-rest-jwt: `pip install 'dj-rest-jwt>=7.0'`
 4. Run tests to verify everything works
 
 ### Breaking Changes
@@ -65,7 +65,7 @@ Version 5.0 switched from `django-rest-framework-jwt` to `djangorestframework-si
    # New
    REST_FRAMEWORK = {
        'DEFAULT_AUTHENTICATION_CLASSES': [
-           'dj_rest_auth.jwt_auth.JWTCookieAuthentication',
+           'dj_rest_jwt.jwt_auth.JWTCookieAuthentication',
        ],
    }
    ```
@@ -122,7 +122,7 @@ Version 3.0 consolidated all settings into a single `REST_AUTH` dictionary.
        ...
 
    # New
-   from dj_rest_auth.app_settings import api_settings
+   from dj_rest_jwt.app_settings import api_settings
    if api_settings.USE_JWT:
        ...
    ```
@@ -149,9 +149,9 @@ If you're migrating from the original `django-rest-auth` package:
    pip uninstall django-rest-auth
    ```
 
-2. Install dj-rest-auth:
+2. Install dj-rest-jwt:
    ```bash
-   pip install dj-rest-auth
+   pip install dj-rest-jwt
    ```
 
 3. Update `INSTALLED_APPS`:
@@ -164,8 +164,8 @@ If you're migrating from the original `django-rest-auth` package:
 
    # New
    INSTALLED_APPS = [
-       'dj_rest_auth',
-       'dj_rest_auth.registration',
+       'dj_rest_jwt',
+       'dj_rest_jwt.registration',
    ]
    ```
 
@@ -176,8 +176,8 @@ If you're migrating from the original `django-rest-auth` package:
    from rest_auth.serializers import UserDetailsSerializer
 
    # New
-   from dj_rest_auth.views import LoginView
-   from dj_rest_auth.serializers import UserDetailsSerializer
+   from dj_rest_jwt.views import LoginView
+   from dj_rest_jwt.serializers import UserDetailsSerializer
    ```
 
 5. Update URL includes:
@@ -186,7 +186,7 @@ If you're migrating from the original `django-rest-auth` package:
    path('api/auth/', include('rest_auth.urls')),
 
    # New
-   path('api/auth/', include('dj_rest_auth.urls')),
+   path('api/auth/', include('dj_rest_jwt.urls')),
    ```
 
 6. Run database migrations (if any):
@@ -200,9 +200,9 @@ Use your IDE's find and replace to update all occurrences:
 
 | Find | Replace |
 |------|---------|
-| `rest_auth` | `dj_rest_auth` |
-| `from rest_auth` | `from dj_rest_auth` |
-| `'rest_auth'` | `'dj_rest_auth'` |
+| `rest_auth` | `dj_rest_jwt` |
+| `from rest_auth` | `from dj_rest_jwt` |
+| `'rest_auth'` | `'dj_rest_jwt'` |
 
 ---
 
@@ -211,7 +211,7 @@ Use your IDE's find and replace to update all occurrences:
 ### Import Errors
 
 If you see `ImportError: No module named 'rest_auth'`:
-- You haven't updated all imports to `dj_rest_auth`
+- You haven't updated all imports to `dj_rest_jwt`
 - Run: `grep -r "rest_auth" --include="*.py" .`
 
 ### Settings Errors

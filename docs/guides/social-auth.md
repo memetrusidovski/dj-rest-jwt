@@ -3,7 +3,7 @@
 Integrate OAuth providers like Google, GitHub, and Facebook using django-allauth.
 
 !!! note "Maintainer's Note"
-    dj-rest-auth has optional and narrow support for django-allauth social authentication. The focus is on providing a clean API wrapper for the most common use cases.
+    dj-rest-jwt has optional and narrow support for django-allauth social authentication. The focus is on providing a clean API wrapper for the most common use cases.
 
 ## Overview
 
@@ -11,7 +11,7 @@ Integrate OAuth providers like Google, GitHub, and Facebook using django-allauth
 sequenceDiagram
     participant User
     participant SPA as Your App
-    participant API as dj-rest-auth
+    participant API as dj-rest-jwt
     participant Provider as OAuth Provider
     
     User->>SPA: Click "Login with Google"
@@ -33,7 +33,7 @@ sequenceDiagram
 ### 1. Install Dependencies
 
 ```bash
-pip install 'dj-rest-auth[with-social]'
+pip install 'dj-rest-jwt[with-social]'
 ```
 
 This installs django-allauth.
@@ -58,9 +58,9 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.github',
     'allauth.socialaccount.providers.facebook',
     
-    # dj-rest-auth
-    'dj_rest_auth',
-    'dj_rest_auth.registration',
+    # dj-rest-jwt
+    'dj_rest_jwt',
+    'dj_rest_jwt.registration',
 ]
 
 MIDDLEWARE = [
@@ -116,7 +116,7 @@ python manage.py migrate
 ```python title="views.py"
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
-from dj_rest_auth.registration.views import SocialLoginView
+from dj_rest_jwt.registration.views import SocialLoginView
 
 class GoogleLogin(SocialLoginView):
     adapter_class = GoogleOAuth2Adapter
@@ -234,7 +234,7 @@ Add via Django Admin (similar to Google setup).
 ```python title="views.py"
 from allauth.socialaccount.providers.github.views import GitHubOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
-from dj_rest_auth.registration.views import SocialLoginView
+from dj_rest_jwt.registration.views import SocialLoginView
 
 class GitHubLogin(SocialLoginView):
     adapter_class = GitHubOAuth2Adapter
@@ -303,7 +303,7 @@ async function handleGitHubCallback() {
 
 ```python title="views.py"
 from allauth.socialaccount.providers.facebook.views import FacebookOAuth2Adapter
-from dj_rest_auth.registration.views import SocialLoginView
+from dj_rest_jwt.registration.views import SocialLoginView
 
 class FacebookLogin(SocialLoginView):
     adapter_class = FacebookOAuth2Adapter
@@ -332,7 +332,7 @@ Allow users to connect additional social accounts to their existing account:
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.github.views import GitHubOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
-from dj_rest_auth.registration.views import SocialConnectView
+from dj_rest_jwt.registration.views import SocialConnectView
 
 class GoogleConnect(SocialConnectView):
     adapter_class = GoogleOAuth2Adapter
@@ -367,7 +367,7 @@ urlpatterns = [
 ### List Connected Accounts
 
 ```python title="urls.py"
-from dj_rest_auth.registration.views import SocialAccountListView
+from dj_rest_jwt.registration.views import SocialAccountListView
 
 urlpatterns = [
     # ...
@@ -399,7 +399,7 @@ urlpatterns = [
 ### Disconnect Social Account
 
 ```python title="urls.py"
-from dj_rest_auth.registration.views import SocialAccountDisconnectView
+from dj_rest_jwt.registration.views import SocialAccountDisconnectView
 
 urlpatterns = [
     # ...

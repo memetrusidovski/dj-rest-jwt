@@ -1,6 +1,6 @@
 # Multi-Factor Authentication (MFA)
 
-dj-rest-auth includes optional TOTP-based MFA with one-time recovery codes. When enabled, users complete login with a second factor from an authenticator app.
+dj-rest-jwt includes optional TOTP-based MFA with one-time recovery codes. When enabled, users complete login with a second factor from an authenticator app.
 
 ## Overview
 
@@ -14,7 +14,7 @@ dj-rest-auth includes optional TOTP-based MFA with one-time recovery codes. When
 ### 1) Install MFA extras
 
 ```bash
-pip install 'dj-rest-auth[with-mfa]'
+pip install 'dj-rest-jwt[with-mfa]'
 ```
 
 `with-mfa` installs TOTP support (`pyotp`).
@@ -26,8 +26,8 @@ INSTALLED_APPS = [
     # ...
     'rest_framework',
     'rest_framework.authtoken',
-    'dj_rest_auth',
-    'dj_rest_auth.mfa',
+    'dj_rest_jwt',
+    'dj_rest_jwt.mfa',
 ]
 ```
 
@@ -41,12 +41,12 @@ python manage.py migrate
 
 ```python title="urls.py"
 from django.urls import include, path
-from dj_rest_auth.mfa.views import MFALoginView
+from dj_rest_jwt.mfa.views import MFALoginView
 
 urlpatterns = [
-    path('dj-rest-auth/login/', MFALoginView.as_view(), name='rest_login'),
-    path('dj-rest-auth/', include('dj_rest_auth.urls')),
-    path('dj-rest-auth/', include('dj_rest_auth.mfa.urls')),
+    path('dj-rest-jwt/login/', MFALoginView.as_view(), name='rest_login'),
+    path('dj-rest-jwt/', include('dj_rest_jwt.urls')),
+    path('dj-rest-jwt/', include('dj_rest_jwt.mfa.urls')),
 ]
 ```
 
@@ -72,7 +72,7 @@ When MFA is enabled for a user:
 
 ### Verify MFA
 
-`POST /dj-rest-auth/mfa/verify/`
+`POST /dj-rest-jwt/mfa/verify/`
 
 Request fields:
 
@@ -81,7 +81,7 @@ Request fields:
 
 ### Activate TOTP (step 1)
 
-`GET /dj-rest-auth/mfa/totp/activate/`
+`GET /dj-rest-jwt/mfa/totp/activate/`
 
 Response fields:
 
@@ -92,7 +92,7 @@ Response fields:
 
 ### Activate TOTP (step 2)
 
-`POST /dj-rest-auth/mfa/totp/activate/`
+`POST /dj-rest-jwt/mfa/totp/activate/`
 
 Request fields:
 
@@ -105,7 +105,7 @@ Response fields:
 
 ### Deactivate TOTP
 
-`POST /dj-rest-auth/mfa/totp/deactivate/`
+`POST /dj-rest-jwt/mfa/totp/deactivate/`
 
 Request fields:
 
@@ -117,7 +117,7 @@ Response:
 
 ### Status
 
-`GET /dj-rest-auth/mfa/status/`
+`GET /dj-rest-jwt/mfa/status/`
 
 Response fields:
 
@@ -127,15 +127,15 @@ Response fields:
 
 ### Recovery codes
 
-- `GET /dj-rest-auth/mfa/recovery-codes/` (list unused codes)
-- `POST /dj-rest-auth/mfa/recovery-codes/regenerate/` (rotate all codes)
+- `GET /dj-rest-jwt/mfa/recovery-codes/` (list unused codes)
+- `POST /dj-rest-jwt/mfa/recovery-codes/regenerate/` (rotate all codes)
 
 ## Security behavior
 
 - `ephemeral_token` expires after `MFA_EPHEMERAL_TOKEN_TIMEOUT` (default 300s)
 - activation requires a signed, user-bound `activation_token`
 - recovery code usage is atomic and one-time
-- sensitive MFA events are logged via `dj_rest_auth.mfa` logger
+- sensitive MFA events are logged via `dj_rest_jwt.mfa` logger
 
 ## Settings
 

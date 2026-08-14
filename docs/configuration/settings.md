@@ -1,10 +1,10 @@
 # Settings Reference
 
-All dj-rest-auth settings are configured in the `REST_AUTH` dictionary in your Django settings.
+All dj-rest-jwt settings are configured in the `REST_AUTH` dictionary in your Django settings.
 
 ```python title="settings.py"
 REST_AUTH = {
-    'LOGIN_SERIALIZER': 'dj_rest_auth.serializers.LoginSerializer',
+    'LOGIN_SERIALIZER': 'dj_rest_jwt.serializers.LoginSerializer',
     'USE_JWT': False,
     # ... more settings
 }
@@ -22,7 +22,7 @@ Path to the serializer class used in `LoginView`.
 
 | | |
 |---|---|
-| **Default** | `'dj_rest_auth.serializers.LoginSerializer'` |
+| **Default** | `'dj_rest_jwt.serializers.LoginSerializer'` |
 | **Type** | String (dotted import path) |
 
 ```python
@@ -39,7 +39,7 @@ Path to the serializer class for Token authentication responses.
 
 | | |
 |---|---|
-| **Default** | `'dj_rest_auth.serializers.TokenSerializer'` |
+| **Default** | `'dj_rest_jwt.serializers.TokenSerializer'` |
 | **Type** | String (dotted import path) |
 
 !!! note
@@ -53,7 +53,7 @@ Path to the serializer class for JWT responses (when `USE_JWT=True`).
 
 | | |
 |---|---|
-| **Default** | `'dj_rest_auth.serializers.JWTSerializer'` |
+| **Default** | `'dj_rest_jwt.serializers.JWTSerializer'` |
 | **Type** | String (dotted import path) |
 
 ---
@@ -64,7 +64,7 @@ Path to the serializer class for JWT responses with expiration times (when `JWT_
 
 | | |
 |---|---|
-| **Default** | `'dj_rest_auth.serializers.JWTSerializerWithExpiration'` |
+| **Default** | `'dj_rest_jwt.serializers.JWTSerializerWithExpiration'` |
 | **Type** | String (dotted import path) |
 
 ---
@@ -101,11 +101,11 @@ Path to the serializer class for `UserDetailsView`.
 
 | | |
 |---|---|
-| **Default** | `'dj_rest_auth.serializers.UserDetailsSerializer'` |
+| **Default** | `'dj_rest_jwt.serializers.UserDetailsSerializer'` |
 | **Type** | String (dotted import path) |
 
 ```python title="serializers.py"
-from dj_rest_auth.serializers import UserDetailsSerializer
+from dj_rest_jwt.serializers import UserDetailsSerializer
 
 class CustomUserDetailsSerializer(UserDetailsSerializer):
     class Meta(UserDetailsSerializer.Meta):
@@ -120,7 +120,7 @@ Path to the serializer class for `PasswordResetView`.
 
 | | |
 |---|---|
-| **Default** | `'dj_rest_auth.serializers.PasswordResetSerializer'` |
+| **Default** | `'dj_rest_jwt.serializers.PasswordResetSerializer'` |
 | **Type** | String (dotted import path) |
 
 ---
@@ -131,7 +131,7 @@ Path to the serializer class for `PasswordResetConfirmView`.
 
 | | |
 |---|---|
-| **Default** | `'dj_rest_auth.serializers.PasswordResetConfirmSerializer'` |
+| **Default** | `'dj_rest_jwt.serializers.PasswordResetConfirmSerializer'` |
 | **Type** | String (dotted import path) |
 
 ---
@@ -142,7 +142,7 @@ Path to the serializer class for `PasswordChangeView`.
 
 | | |
 |---|---|
-| **Default** | `'dj_rest_auth.serializers.PasswordChangeSerializer'` |
+| **Default** | `'dj_rest_jwt.serializers.PasswordChangeSerializer'` |
 | **Type** | String (dotted import path) |
 
 ---
@@ -153,14 +153,14 @@ Path to the serializer class for `RegisterView`.
 
 | | |
 |---|---|
-| **Default** | `'dj_rest_auth.registration.serializers.RegisterSerializer'` |
+| **Default** | `'dj_rest_jwt.registration.serializers.RegisterSerializer'` |
 | **Type** | String (dotted import path) |
 
 !!! warning "Custom Serializer Requirement"
     Your custom `REGISTER_SERIALIZER` **must** define a `save(self, request)` method that returns a user model instance.
 
 ```python title="serializers.py"
-from dj_rest_auth.registration.serializers import RegisterSerializer
+from dj_rest_jwt.registration.serializers import RegisterSerializer
 
 class CustomRegisterSerializer(RegisterSerializer):
     phone_number = serializers.CharField(max_length=20, required=False)
@@ -215,7 +215,7 @@ Path to the callable that creates tokens.
 
 | | |
 |---|---|
-| **Default** | `'dj_rest_auth.utils.default_create_token'` |
+| **Default** | `'dj_rest_jwt.utils.default_create_token'` |
 | **Type** | String (dotted import path) |
 
 The callable signature: `create_token(token_model, user, serializer) -> token`
@@ -457,7 +457,7 @@ When `True`, CSRF validation is required for all views (authenticated and unauth
 
 ## Passkey Settings
 
-These settings only apply when `dj_rest_auth.passkeys` is in `INSTALLED_APPS`.
+These settings only apply when `dj_rest_jwt.passkeys` is in `INSTALLED_APPS`.
 
 ### PASSKEY_RP_ID
 
@@ -518,12 +518,12 @@ All passkey serializers are overridable via dotted import paths. These are resol
 
 | Setting | Default |
 |---------|---------|
-| `PASSKEY_REGISTER_BEGIN_SERIALIZER` | `'dj_rest_auth.passkeys.serializers.PasskeyRegisterBeginSerializer'` |
-| `PASSKEY_REGISTER_COMPLETE_SERIALIZER` | `'dj_rest_auth.passkeys.serializers.PasskeyRegisterCompleteSerializer'` |
-| `PASSKEY_LOGIN_BEGIN_SERIALIZER` | `'dj_rest_auth.passkeys.serializers.PasskeyLoginBeginSerializer'` |
-| `PASSKEY_LOGIN_COMPLETE_SERIALIZER` | `'dj_rest_auth.passkeys.serializers.PasskeyLoginCompleteSerializer'` |
-| `PASSKEY_LIST_SERIALIZER` | `'dj_rest_auth.passkeys.serializers.PasskeyListSerializer'` |
-| `PASSKEY_UPDATE_SERIALIZER` | `'dj_rest_auth.passkeys.serializers.PasskeyUpdateSerializer'` |
+| `PASSKEY_REGISTER_BEGIN_SERIALIZER` | `'dj_rest_jwt.passkeys.serializers.PasskeyRegisterBeginSerializer'` |
+| `PASSKEY_REGISTER_COMPLETE_SERIALIZER` | `'dj_rest_jwt.passkeys.serializers.PasskeyRegisterCompleteSerializer'` |
+| `PASSKEY_LOGIN_BEGIN_SERIALIZER` | `'dj_rest_jwt.passkeys.serializers.PasskeyLoginBeginSerializer'` |
+| `PASSKEY_LOGIN_COMPLETE_SERIALIZER` | `'dj_rest_jwt.passkeys.serializers.PasskeyLoginCompleteSerializer'` |
+| `PASSKEY_LIST_SERIALIZER` | `'dj_rest_jwt.passkeys.serializers.PasskeyListSerializer'` |
+| `PASSKEY_UPDATE_SERIALIZER` | `'dj_rest_jwt.passkeys.serializers.PasskeyUpdateSerializer'` |
 
 ---
 
@@ -532,23 +532,23 @@ All passkey serializers are overridable via dotted import paths. These are resol
 ```python title="settings.py"
 REST_AUTH = {
     # Serializers
-    'LOGIN_SERIALIZER': 'dj_rest_auth.serializers.LoginSerializer',
-    'TOKEN_SERIALIZER': 'dj_rest_auth.serializers.TokenSerializer',
-    'JWT_SERIALIZER': 'dj_rest_auth.serializers.JWTSerializer',
-    'JWT_SERIALIZER_WITH_EXPIRATION': 'dj_rest_auth.serializers.JWTSerializerWithExpiration',
+    'LOGIN_SERIALIZER': 'dj_rest_jwt.serializers.LoginSerializer',
+    'TOKEN_SERIALIZER': 'dj_rest_jwt.serializers.TokenSerializer',
+    'JWT_SERIALIZER': 'dj_rest_jwt.serializers.JWTSerializer',
+    'JWT_SERIALIZER_WITH_EXPIRATION': 'dj_rest_jwt.serializers.JWTSerializerWithExpiration',
     'JWT_TOKEN_CLAIMS_SERIALIZER': 'rest_framework_simplejwt.serializers.TokenObtainPairSerializer',
-    'USER_DETAILS_SERIALIZER': 'dj_rest_auth.serializers.UserDetailsSerializer',
-    'PASSWORD_RESET_SERIALIZER': 'dj_rest_auth.serializers.PasswordResetSerializer',
-    'PASSWORD_RESET_CONFIRM_SERIALIZER': 'dj_rest_auth.serializers.PasswordResetConfirmSerializer',
-    'PASSWORD_CHANGE_SERIALIZER': 'dj_rest_auth.serializers.PasswordChangeSerializer',
-    'REGISTER_SERIALIZER': 'dj_rest_auth.registration.serializers.RegisterSerializer',
+    'USER_DETAILS_SERIALIZER': 'dj_rest_jwt.serializers.UserDetailsSerializer',
+    'PASSWORD_RESET_SERIALIZER': 'dj_rest_jwt.serializers.PasswordResetSerializer',
+    'PASSWORD_RESET_CONFIRM_SERIALIZER': 'dj_rest_jwt.serializers.PasswordResetConfirmSerializer',
+    'PASSWORD_CHANGE_SERIALIZER': 'dj_rest_jwt.serializers.PasswordChangeSerializer',
+    'REGISTER_SERIALIZER': 'dj_rest_jwt.registration.serializers.RegisterSerializer',
     
     # Permissions
     'REGISTER_PERMISSION_CLASSES': ('rest_framework.permissions.AllowAny',),
     
     # Token
     'TOKEN_MODEL': 'rest_framework.authtoken.models.Token',
-    'TOKEN_CREATOR': 'dj_rest_auth.utils.default_create_token',
+    'TOKEN_CREATOR': 'dj_rest_jwt.utils.default_create_token',
     
     # Behavior
     'PASSWORD_RESET_USE_SITES_DOMAIN': False,
@@ -569,7 +569,7 @@ REST_AUTH = {
     'JWT_AUTH_COOKIE_USE_CSRF': False,
     'JWT_AUTH_COOKIE_ENFORCE_CSRF_ON_UNAUTHENTICATED': False,
 
-    # Passkeys (requires dj_rest_auth.passkeys)
+    # Passkeys (requires dj_rest_jwt.passkeys)
     'PASSKEY_RP_ID': None,
     'PASSKEY_RP_NAME': None,
     'PASSKEY_RP_ORIGINS': None,
