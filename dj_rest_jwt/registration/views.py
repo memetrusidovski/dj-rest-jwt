@@ -22,6 +22,9 @@ from dj_rest_jwt.registration.serializers import (
     SocialAccountSerializer, SocialConnectSerializer, SocialLoginSerializer,
     VerifyEmailSerializer, ResendEmailVerificationSerializer
 )
+from dj_rest_jwt.throttling import (
+    LoginRateThrottle, PasswordResetRateThrottle, RegisterRateThrottle,
+)
 from dj_rest_jwt.utils import jwt_encode
 from dj_rest_jwt.views import LoginView
 
@@ -40,7 +43,7 @@ class RegisterView(CreateAPIView):
     serializer_class = api_settings.REGISTER_SERIALIZER
     permission_classes = api_settings.REGISTER_PERMISSION_CLASSES
     token_model = TokenModel
-    throttle_scope = 'dj_rest_jwt'
+    throttle_classes = (RegisterRateThrottle,)
 
     @sensitive_post_parameters_m
     def dispatch(self, *args, **kwargs):
@@ -105,6 +108,7 @@ class VerifyEmailView(APIView, ConfirmEmailView):
     """
     permission_classes = (AllowAny,)
     allowed_methods = ('POST', 'OPTIONS', 'HEAD')
+    throttle_classes = (LoginRateThrottle,)
 
     def get_serializer(self, *args, **kwargs):
         return VerifyEmailSerializer(*args, **kwargs)
@@ -130,6 +134,7 @@ class ResendEmailVerificationView(CreateAPIView):
     permission_classes = (AllowAny,)
     serializer_class = ResendEmailVerificationSerializer
     queryset = EmailAddress.objects.all()
+    throttle_classes = (PasswordResetRateThrottle,)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
