@@ -1,8 +1,43 @@
 {% extends "base.html" %}
+{% block title %}Log out &middot; dj-rest-jwt demo{% endblock %}
 
 {% block content %}
-  <div class="row">
-    <h3>Logout</h3><hr/>
-    {% include "fragments/logout_form.html" %}
+  <div class="page-head">
+    <h1>Log out</h1>
+    <p>
+      Invalidates the token server-side. The demo then drops its copy, so the other pages
+      go back to unauthenticated.
+    </p>
+    <span class="endpoint"><span class="verb">POST</span>{% url 'rest_logout' %}</span>
+  </div>
+
+  {% include "fragments/session.html" %}
+
+  <div class="split"
+       x-data="apiForm({
+         url: '{% url 'rest_logout' %}',
+         auth: true,
+         onSuccess() { Alpine.store('auth').clear(); }
+       })">
+
+    <div class="card">
+      <h2 class="card__title">End the session</h2>
+      <p class="card__hint">Sends the token you're currently holding.</p>
+
+      <div class="note" x-show="!$store.auth.on" x-cloak>
+        No token held. <a href="{% url 'login' %}">Log in</a> first, then come back.
+      </div>
+
+      <div class="actions">
+        <button type="button" class="btn btn--primary" :disabled="loading || !$store.auth.on" @click="send()">
+          <span class="spinner" x-show="loading" x-cloak></span>
+          <span x-text="loading ? 'Logging out…' : 'Log out'"></span>
+        </button>
+        <button type="button" class="btn btn--ghost" @click="$store.auth.clear()"
+                title="Drops the browser's copy without telling the API">Forget locally</button>
+      </div>
+    </div>
+
+    {% include "fragments/response.html" %}
   </div>
 {% endblock %}

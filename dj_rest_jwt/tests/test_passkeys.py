@@ -23,7 +23,13 @@ PASSKEY_SETTINGS = {
 
 FAKE_CREDENTIAL_ID = b'\x01\x02\x03\x04\x05\x06\x07\x08'
 FAKE_PUBLIC_KEY = b'\x10\x20\x30\x40\x50\x60\x70\x80'
-FAKE_CREDENTIAL_ID_B64 = base64.urlsafe_b64encode(FAKE_CREDENTIAL_ID).rstrip(b'=').decode()
+
+
+def _b64(raw):
+    return base64.urlsafe_b64encode(raw).rstrip(b'=').decode()
+
+
+FAKE_CREDENTIAL_ID_B64 = _b64(FAKE_CREDENTIAL_ID)
 FAKE_CHALLENGE = b'\xaa\xbb\xcc\xdd' * 8
 FAKE_CHALLENGE_B64 = base64.b64encode(FAKE_CHALLENGE).decode()
 
@@ -79,8 +85,8 @@ FAKE_ATTESTATION_RESPONSE = {
     'response': {
         'attestationObject': base64.urlsafe_b64encode(b'fake-attestation').rstrip(b'=').decode(),
         'clientDataJSON': base64.urlsafe_b64encode(b'fake-client-data').rstrip(b'=').decode(),
+        'transports': ['internal'],
     },
-    'transports': ['internal'],
 }
 
 FAKE_ASSERTION_RESPONSE = {
@@ -137,7 +143,7 @@ class PasskeyRegistrationTests(TestsMixin, TestCase):
 
         self.post(
             self.register_complete_url,
-            data={'credential': FAKE_ATTESTATION_RESPONSE, 'name': 'My Key'},
+            data={'credential': FAKE_ATTESTATION_RESPONSE, 'name': 'My Key', 'password': self.PASS},
             status_code=201,
         )
         self.assertEqual(self.response.json['name'], 'My Key')
@@ -158,7 +164,7 @@ class PasskeyRegistrationTests(TestsMixin, TestCase):
         self.post(self.register_begin_url, data={}, status_code=200)
         self.post(
             self.register_complete_url,
-            data={'credential': FAKE_ATTESTATION_RESPONSE},
+            data={'credential': FAKE_ATTESTATION_RESPONSE, 'password': self.PASS},
             status_code=201,
         )
 
@@ -166,7 +172,7 @@ class PasskeyRegistrationTests(TestsMixin, TestCase):
         self.post(self.register_begin_url, data={}, status_code=200)
         self.post(
             self.register_complete_url,
-            data={'credential': FAKE_ATTESTATION_RESPONSE},
+            data={'credential': FAKE_ATTESTATION_RESPONSE, 'password': self.PASS},
             status_code=400,
         )
 
@@ -175,7 +181,7 @@ class PasskeyRegistrationTests(TestsMixin, TestCase):
         # No begin step, so no challenge in cache
         self.post(
             self.register_complete_url,
-            data={'credential': FAKE_ATTESTATION_RESPONSE},
+            data={'credential': FAKE_ATTESTATION_RESPONSE, 'password': self.PASS},
             status_code=400,
         )
         self.assertIn('expired', str(self.response.json).lower())
@@ -200,7 +206,7 @@ class PasskeyLoginTests(TestsMixin, TestCase):
         return WebAuthnCredential.objects.create(
             user=self.user,
             name='Test Key',
-            credential_id=FAKE_CREDENTIAL_ID,
+            credential_id=FAKE_CREDENTIAL_ID_B64,
             public_key=FAKE_PUBLIC_KEY,
             sign_count=0,
             transports=['internal'],
@@ -347,7 +353,7 @@ class PasskeyManagementTests(TestsMixin, TestCase):
         return WebAuthnCredential.objects.create(
             user=user,
             name=name,
-            credential_id=b'\x01\x02\x03\x04' + str(user.pk).encode() + name.encode(),
+            credential_id=_b64(b'\x01\x02\x03\x04' + str(user.pk).encode() + name.encode()),
             public_key=FAKE_PUBLIC_KEY,
             sign_count=0,
             transports=['internal'],
@@ -383,10 +389,21 @@ class PasskeyManagementTests(TestsMixin, TestCase):
         cred = self._create_credential()
         detail_url = reverse('passkey_detail', kwargs={'pk': cred.pk})
 
-        self.send_request('delete', detail_url, status_code=204)
+        self.send_request('delete', detail_url, data={'password': self.PASS}, status_code=204)
 
         from dj_rest_jwt.passkeys.models import WebAuthnCredential
         self.assertFalse(WebAuthnCredential.objects.filter(pk=cred.pk).exists())
+
+    def test_delete_passkey_requires_reauth(self):
+        self._authenticate()
+        cred = self._create_credential()
+        detail_url = reverse('passkey_detail', kwargs={'pk': cred.pk})
+
+        self.send_request('delete', detail_url, data={}, status_code=400)
+        self.send_request('delete', detail_url, data={'password': 'wrong-password'}, status_code=400)
+
+        from dj_rest_jwt.passkeys.models import WebAuthnCredential
+        self.assertTrue(WebAuthnCredential.objects.filter(pk=cred.pk).exists())
 
     def test_cannot_access_other_users_passkey(self):
         self._authenticate()
@@ -395,7 +412,9 @@ class PasskeyManagementTests(TestsMixin, TestCase):
 
         self.get(detail_url, status_code=404)
         self.patch(detail_url, data={'name': 'Hacked'}, status_code=404)
-        self.send_request('delete', detail_url, status_code=404)
+        # 404 rather than 400: whether the passkey exists must not depend on
+        # whether the caller supplied valid re-auth credentials.
+        self.send_request('delete', detail_url, data={'password': self.PASS}, status_code=404)
 
     def test_retrieve_passkey(self):
         self._authenticate()
@@ -425,7 +444,7 @@ class PasskeyLoginEdgeCaseTests(TestsMixin, TestCase):
         return WebAuthnCredential.objects.create(
             user=self.user,
             name='Test Key',
-            credential_id=FAKE_CREDENTIAL_ID,
+            credential_id=FAKE_CREDENTIAL_ID_B64,
             public_key=FAKE_PUBLIC_KEY,
             sign_count=0,
             transports=['internal'],
@@ -551,7 +570,7 @@ class PasskeyRegistrationEdgeCaseTests(TestsMixin, TestCase):
         self.post(self.register_begin_url, data={}, status_code=200)
         self.post(
             self.register_complete_url,
-            data={'credential': FAKE_ATTESTATION_RESPONSE},
+            data={'credential': FAKE_ATTESTATION_RESPONSE, 'password': self.PASS},
             status_code=201,
         )
         self.assertEqual(self.response.json['name'], 'Passkey')
@@ -599,7 +618,7 @@ class PasskeyJWTLoginTests(TestsMixin, TestCase):
         return WebAuthnCredential.objects.create(
             user=self.user,
             name='Test Key',
-            credential_id=FAKE_CREDENTIAL_ID,
+            credential_id=FAKE_CREDENTIAL_ID_B64,
             public_key=FAKE_PUBLIC_KEY,
             sign_count=0,
             transports=['internal'],
@@ -629,3 +648,128 @@ class PasskeyJWTLoginTests(TestsMixin, TestCase):
             )
             self.assertIn('access', self.response.json)
             self.assertIn('user', self.response.json)
+
+
+@override_settings(ROOT_URLCONF='tests.urls')
+class PasskeyMFAInteractionTests(TestsMixin, TestCase):
+    """
+    Passkey login goes through LoginView, so a user who has enrolled TOTP must
+    still be challenged for it. Before the fix, passkeys (and social login) were
+    a way straight past a second factor the user had deliberately turned on.
+    """
+    USERNAME = 'mfauser'
+    PASS = 'testpassword123!'
+    EMAIL = 'mfauser@example.com'
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(self.USERNAME, self.EMAIL, self.PASS)
+        self.login_begin_url = reverse('passkey_login_begin')
+        self.login_complete_url = reverse('passkey_login_complete')
+        cache.clear()
+
+        from dj_rest_jwt.mfa.totp import TOTP, generate_totp_secret
+        self.secret = generate_totp_secret()
+        TOTP.activate(self.user, self.secret)
+
+        from dj_rest_jwt.passkeys.models import WebAuthnCredential
+        WebAuthnCredential.objects.create(
+            user=self.user,
+            name='Test Key',
+            credential_id=FAKE_CREDENTIAL_ID_B64,
+            public_key=FAKE_PUBLIC_KEY,
+            sign_count=0,
+            transports=['internal'],
+            discoverable=True,
+        )
+
+    def _complete_login(self):
+        self.post(self.login_begin_url, data={}, status_code=200)
+        session_id = self.response.json['session_id']
+        return self.post(
+            self.login_complete_url,
+            data={'credential': FAKE_ASSERTION_RESPONSE, 'session_id': session_id},
+            status_code=200,
+        )
+
+    @patch('dj_rest_jwt.passkeys.serializers.verify_authentication_response')
+    @patch('dj_rest_jwt.passkeys.serializers.generate_authentication_options')
+    def test_passkey_login_still_challenges_for_mfa(self, mock_gen, mock_verify):
+        mock_gen.return_value = _make_fake_authentication_options()
+        mock_verify.return_value = MockVerifiedAuthentication()
+
+        response = self._complete_login()
+        self.assertTrue(response.json['mfa_required'])
+        self.assertIn('ephemeral_token', response.json)
+        self.assertNotIn('key', response.json)
+
+    @patch('dj_rest_jwt.passkeys.serializers.verify_authentication_response')
+    @patch('dj_rest_jwt.passkeys.serializers.generate_authentication_options')
+    def test_passkey_can_be_configured_to_satisfy_mfa(self, mock_gen, mock_verify):
+        from dj_rest_jwt.tests.utils import override_api_settings
+        mock_gen.return_value = _make_fake_authentication_options()
+        mock_verify.return_value = MockVerifiedAuthentication()
+
+        with override_api_settings(PASSKEY_SATISFIES_MFA=True):
+            response = self._complete_login()
+        self.assertIn('key', response.json)
+        self.assertNotIn('ephemeral_token', response.json)
+
+
+@override_settings(ROOT_URLCONF='tests.urls')
+class PasskeyMalformedInputTests(TestsMixin, TestCase):
+    """A malformed rawId used to escape as binascii.Error - a 500 on an
+    unauthenticated endpoint."""
+    USERNAME = 'testuser'
+    PASS = 'testpassword123!'
+    EMAIL = 'test@example.com'
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(self.USERNAME, self.EMAIL, self.PASS)
+        self.login_begin_url = reverse('passkey_login_begin')
+        self.login_complete_url = reverse('passkey_login_complete')
+        cache.clear()
+
+    @patch('dj_rest_jwt.passkeys.serializers.generate_authentication_options')
+    def _session_id(self, mock_gen):
+        mock_gen.return_value = _make_fake_authentication_options()
+        self.post(self.login_begin_url, data={}, status_code=200)
+        return self.response.json['session_id']
+
+    def _post_raw_id(self, raw_id):
+        session_id = self._session_id()
+        credential = dict(FAKE_ASSERTION_RESPONSE, rawId=raw_id, id=raw_id)
+        return self.post(
+            self.login_complete_url,
+            data={'credential': credential, 'session_id': session_id},
+            status_code=400,
+        )
+
+    def test_non_base64_raw_id_is_a_400(self):
+        self._post_raw_id('a')
+
+    def test_non_string_raw_id_is_a_400(self):
+        self._post_raw_id(12345)
+
+    def test_empty_raw_id_is_a_400(self):
+        self._post_raw_id('')
+
+
+class PasskeyTransportParsingTests(TestCase):
+    def test_transports_are_read_from_the_response_object(self):
+        """
+        Per the WebAuthn spec transports live on `credential.response`. Reading
+        the top level instead silently recorded an empty list for every passkey.
+        """
+        from dj_rest_jwt.passkeys.serializers import _extract_transports
+
+        self.assertEqual(
+            _extract_transports({'response': {'transports': ['internal', 'hybrid']}}),
+            ['internal', 'hybrid'],
+        )
+        # The old (wrong) location is not a fallback.
+        self.assertEqual(_extract_transports({'transports': ['usb']}), [])
+        self.assertEqual(_extract_transports({}), [])
+        self.assertEqual(_extract_transports('nonsense'), [])
+        self.assertEqual(_extract_transports({'response': {'transports': [1, 'usb']}}), ['usb'])

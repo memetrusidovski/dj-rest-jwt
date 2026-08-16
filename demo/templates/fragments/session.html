@@ -1,0 +1,26 @@
+{% comment %}
+Shows whether the demo is currently holding an auth token. Every protected
+page reads the same Alpine store, so logging in once is enough - no copying
+tokens between forms.
+{% endcomment %}
+<div class="session" x-data x-cloak
+     :class="$store.auth.on ? 'session--on' : 'session--off'">
+  <span class="session__dot"></span>
+
+  <template x-if="$store.auth.on">
+    <span>
+      Signed in<template x-if="$store.auth.username"><span> as <strong x-text="$store.auth.username"></strong></span></template>
+      &middot; <code x-text="$store.auth.token"></code>
+    </span>
+  </template>
+
+  <template x-if="!$store.auth.on">
+    <span>No token held &mdash; <a href="{% url 'login' %}">log in</a> to authenticate these requests.</span>
+  </template>
+
+  <span class="session__actions" x-show="$store.auth.on">
+    <button type="button" class="btn btn--ghost btn--xs"
+            @click="navigator.clipboard.writeText($store.auth.token); $el.textContent = 'Copied'; setTimeout(() => $el.textContent = 'Copy', 1200)">Copy</button>
+    <button type="button" class="btn btn--ghost btn--xs" @click="$store.auth.clear()">Forget</button>
+  </span>
+</div>

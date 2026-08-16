@@ -1,16 +1,18 @@
+import json
 from unittest.mock import patch
 
 import pyotp
 from django.contrib.auth import get_user_model
 from django.test import TestCase, modify_settings, override_settings
 
+from dj_rest_jwt.mfa.models import Authenticator
 from dj_rest_jwt.mfa.recovery_codes import RecoveryCodes
 from dj_rest_jwt.mfa.totp import (TOTP, generate_totp_secret,
-                                   validate_totp_code)
+                                  validate_totp_code)
 from dj_rest_jwt.mfa.utils import (create_ephemeral_token,
-                                    create_totp_activation_token,
-                                    is_mfa_enabled, verify_ephemeral_token,
-                                    verify_totp_activation_token)
+                                   create_totp_activation_token,
+                                   is_mfa_enabled, verify_ephemeral_token,
+                                   verify_totp_activation_token)
 
 from .mixins import APIClient, TestsMixin
 from .utils import override_api_settings
@@ -69,7 +71,18 @@ class MFAUnitTests(TestCase):
         codes = RecoveryCodes.activate(self.user)
         self.assertEqual(len(codes), 10)
         for code in codes:
-            self.assertRegex(code, r'^[0-9a-f]{4}-[0-9a-f]{4}$')
+            self.assertRegex(code, r'^[0-9a-f]{5}-[0-9a-f]{5}$')
+        self.assertEqual(len(set(codes)), 10)
+
+    def test_recovery_codes_are_not_stored_in_plaintext(self):
+        codes = RecoveryCodes.activate(self.user)
+        auth = Authenticator.objects.get(
+            user=self.user, type=Authenticator.Type.RECOVERY_CODES,
+        )
+        stored = json.dumps(auth.data)
+        for code in codes:
+            self.assertNotIn(code, stored)
+        self.assertNotIn('seed', auth.data)
 
     def test_recovery_codes_validate(self):
         codes = RecoveryCodes.activate(self.user)
@@ -78,18 +91,16 @@ class MFAUnitTests(TestCase):
         # Same code should not work twice
         self.assertFalse(RecoveryCodes.validate_code(self.user, first_code))
 
-    def test_recovery_codes_get_unused(self):
+    def test_recovery_codes_get_unused_count(self):
         codes = RecoveryCodes.activate(self.user)
-        unused = RecoveryCodes.get_unused_codes(self.user)
-        self.assertEqual(len(unused), 10)
+        self.assertEqual(RecoveryCodes.get_unused_count(self.user), 10)
         RecoveryCodes.validate_code(self.user, codes[0])
-        unused = RecoveryCodes.get_unused_codes(self.user)
-        self.assertEqual(len(unused), 9)
+        self.assertEqual(RecoveryCodes.get_unused_count(self.user), 9)
 
     def test_recovery_codes_deactivate(self):
         RecoveryCodes.activate(self.user)
         RecoveryCodes.deactivate(self.user)
-        self.assertEqual(RecoveryCodes.get_unused_codes(self.user), [])
+        self.assertEqual(RecoveryCodes.get_unused_count(self.user), 0)
 
     def test_ephemeral_token(self):
         token = create_ephemeral_token(self.user)
@@ -526,15 +537,18 @@ class MFALoginFlowTests(TestsMixin, TestCase):
         log_mock.assert_called_once()
         self.assertEqual(log_mock.call_args.args[2], 'deactivation_failed')
 
-    def test_recovery_codes_view(self):
-        """Should list unused recovery codes."""
+    def test_recovery_codes_view_reports_count_only(self):
+        """The codes themselves are hashed, so only the remaining count is exposed."""
         self._login_get_token()
         secret = generate_totp_secret()
         TOTP.activate(self.user, secret)
-        RecoveryCodes.activate(self.user)
+        codes = RecoveryCodes.activate(self.user)
 
-        response = self.post(self.recovery_codes_url, status_code=200)
-        self.assertEqual(len(response.json['codes']), 10)
+        response = self.get(self.recovery_codes_url, status_code=200)
+        self.assertEqual(response.json['remaining'], 10)
+        self.assertNotIn('codes', response.json)
+        for code in codes:
+            self.assertNotIn(code, str(response.json))
 
     def test_recovery_codes_regenerate(self):
         """Should regenerate new recovery codes."""
@@ -544,7 +558,11 @@ class MFALoginFlowTests(TestsMixin, TestCase):
         self._mfa_login_get_token(secret)
 
         with patch('dj_rest_jwt.mfa.audit.logger.log') as log_mock:
-            response = self.post(self.recovery_codes_regenerate_url, status_code=200)
+            response = self.post(
+                self.recovery_codes_regenerate_url,
+                data={'password': self.PASS},
+                status_code=200,
+            )
         self.assertEqual(len(response.json['codes']), 10)
         self.assertNotEqual(response.json['codes'], old_codes)
         log_mock.assert_called_once()
@@ -553,7 +571,25 @@ class MFALoginFlowTests(TestsMixin, TestCase):
     def test_recovery_codes_regenerate_without_mfa(self):
         """Should fail to regenerate when MFA is not enabled."""
         self._login_get_token()
-        self.post(self.recovery_codes_regenerate_url, status_code=400)
+        self.post(
+            self.recovery_codes_regenerate_url,
+            data={'password': self.PASS},
+            status_code=400,
+        )
+
+    def test_recovery_codes_regenerate_requires_reauth(self):
+        """A bare access token must not be enough to mint new bypass codes."""
+        secret = generate_totp_secret()
+        TOTP.activate(self.user, secret)
+        RecoveryCodes.activate(self.user)
+        self._mfa_login_get_token(secret)
+
+        self.post(self.recovery_codes_regenerate_url, data={}, status_code=400)
+        self.post(
+            self.recovery_codes_regenerate_url,
+            data={'password': 'not-my-password'},
+            status_code=400,
+        )
 
     def test_full_mfa_flow(self):
         """End-to-end: activate MFA, login with TOTP, login with recovery code,
@@ -588,9 +624,9 @@ class MFALoginFlowTests(TestsMixin, TestCase):
         self.assertTrue(response.json['mfa_enabled'])
         self.assertIsNotNone(response.json['created_at'])
 
-        # 6. View recovery codes
-        response = self.post(self.recovery_codes_url, status_code=200)
-        self.assertEqual(len(response.json['codes']), 10)
+        # 6. Check remaining recovery codes
+        response = self.get(self.recovery_codes_url, status_code=200)
+        self.assertEqual(response.json['remaining'], 10)
 
         # 7. Clear token, login again - should get ephemeral token
         del self.token
@@ -629,13 +665,15 @@ class MFALoginFlowTests(TestsMixin, TestCase):
         self.token = response.json['key']
 
         # 11. Verify the used recovery codes are consumed
-        response = self.post(self.recovery_codes_url, status_code=200)
-        self.assertEqual(len(response.json['codes']), 8)
-        self.assertNotIn(recovery_codes[0], response.json['codes'])
-        self.assertNotIn(recovery_codes[9], response.json['codes'])
+        response = self.get(self.recovery_codes_url, status_code=200)
+        self.assertEqual(response.json['remaining'], 8)
 
         # 12. Regenerate recovery codes
-        response = self.post(self.recovery_codes_regenerate_url, status_code=200)
+        response = self.post(
+            self.recovery_codes_regenerate_url,
+            data={'password': self.PASS},
+            status_code=200,
+        )
         new_codes = response.json['codes']
         self.assertEqual(len(new_codes), 10)
         self.assertNotEqual(new_codes, recovery_codes)

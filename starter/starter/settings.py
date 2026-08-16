@@ -11,18 +11,25 @@ https://docs.djangoproject.com/en/1.7/ref/settings/
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
 
+from django.core.management.utils import get_random_secret_key
+
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/1.7/howto/deployment/checklist/
+# This is a starter template meant to be copied into a real project, so it reads
+# its security-critical settings from the environment and only falls back to
+# development-friendly values. Set DJANGO_DEBUG=0 and DJANGO_SECRET_KEY before
+# deploying anywhere real.
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'ma3c@7uu!%e0=tynp+i6+q%$)9v@$t(eulqurym_b=48z82&5n'
+# A generated key changes on every restart, which logs everyone out - fine for a
+# scratch project, not something to rely on. Set DJANGO_SECRET_KEY in any
+# environment you care about.
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or get_random_secret_key()
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', '1') == '1'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    h for h in os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h
+]
 
 # Application definition
 
@@ -36,6 +43,9 @@ INSTALLED_APPS = [
     'django.contrib.sites',
     'rest_framework',
     'rest_framework.authtoken',
+    # Required for logout and for password changes to actually revoke
+    # already-issued refresh tokens.
+    'rest_framework_simplejwt.token_blacklist',
     'dj_rest_jwt',
     'allauth',
     'allauth.account',
@@ -114,12 +124,18 @@ REST_AUTH = {
     'SESSION_LOGIN': True,
     'USE_JWT': True,
     'JWT_AUTH_COOKIE': 'auth',
-    'JWT_AUTH_HTTPONLY': False,
+    'JWT_AUTH_REFRESH_COOKIE': 'refresh',
+    # Keep the token out of reach of JavaScript, so an XSS bug in the frontend
+    # can't walk off with it.
+    'JWT_AUTH_HTTPONLY': True,
+    # Off only so the template works over http://localhost. Must be True
+    # anywhere with a real domain.
+    'JWT_AUTH_SECURE': not DEBUG,
 }
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 SITE_ID = 1
-ACCOUNT_EMAIL_REQUIRED = False
+ACCOUNT_SIGNUP_FIELDS = ['email', 'username*', 'password1*', 'password2*']
 ACCOUNT_LOGIN_METHODS = {'username'}
 ACCOUNT_EMAIL_VERIFICATION = 'optional'
 
@@ -139,7 +155,15 @@ SWAGGER_SETTINGS = {
 }
 
 
-# For demo purposes only. Use a white list in the real world.
-CORS_ORIGIN_ALLOW_ALL = True
+# An allowlist, not "*": CORS_ALLOW_CREDENTIALS with a wildcard origin would let
+# any site on the internet make authenticated requests with the user's cookie.
+CORS_ALLOWED_ORIGINS = [
+    o for o in os.environ.get(
+        'DJANGO_CORS_ALLOWED_ORIGINS',
+        'http://localhost:3000,http://127.0.0.1:3000',
+    ).split(',') if o
+]
+CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = list(CORS_ALLOWED_ORIGINS)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'

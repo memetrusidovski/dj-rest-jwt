@@ -42,15 +42,20 @@ pip install -r dj_rest_jwt/tests/requirements.txt
 ### Core Package (`dj_rest_jwt/`)
 
 - **`app_settings.py`** — Central configuration via `REST_AUTH` Django setting dict. All serializers and the token model are specified as dotted import strings, making everything overridable without subclassing. Access settings via the `api_settings` singleton.
-- **`views.py`** — `LoginView`, `LogoutView`, `UserDetailsView`, `PasswordResetView`, `PasswordResetConfirmView`, `PasswordChangeView`. All views use `throttle_scope = 'dj_rest_jwt'`.
+- **`views.py`** — `LoginView`, `LogoutView`, `UserDetailsView`, `PasswordResetView`, `PasswordResetConfirmView`, `PasswordChangeView`. `LoginView` owns the MFA challenge (`mfa_required()`/`issue_tokens()`) so every login path — password, social, passkey — inherits it.
 - **`serializers.py`** — Core serializers for all auth operations.
 - **`jwt_auth.py`** — `JWTCookieAuthentication` (subclasses simplejwt's `JWTAuthentication`), cookie helpers, refresh view factory. Only active when `USE_JWT=True`.
+- **`throttling.py`** — `ConfigurableRateThrottle` subclasses reading rates from `REST_AUTH`. Views must set `throttle_classes`; a bare `throttle_scope` is inert unless the project registers DRF's `ScopedRateThrottle`.
+- **`social_verification.py`** — Provider access-token audience checks (Google/GitHub/Facebook), preventing token substitution.
+- **`revocation.py`** — Blacklists refresh tokens on password change/reset.
+- **`reauth.py`** — `ReauthSerializerMixin`: step-up password/second-factor check for credential changes.
+- **`checks.py`** — Django system checks for dangerous setting combinations (registered from `apps.py`).
 - **`urls.py`** — Uses `re_path` with trailing `/?` to make slashes optional. JWT endpoints conditionally registered.
 - **`models.py`** — No custom models; resolves and re-exports the configured Token model via `get_token_model()`.
 
 ### Registration Sub-package (`dj_rest_jwt/registration/`)
 
-Requires django-allauth. Provides `RegisterView`, `VerifyEmailView`, social login/connect views, and corresponding serializers.
+Requires django-allauth. Provides `RegisterView`, `VerifyEmailView`, social login/connect views (including ready-made Google/GitHub/Microsoft/Apple), and corresponding serializers.
 
 ### Key Design Patterns
 
@@ -61,10 +66,10 @@ Requires django-allauth. Provides `RegisterView`, `VerifyEmailView`, social logi
 
 ### Testing (`dj_rest_jwt/tests/`)
 
-- **`settings.py`** — Test Django settings (SQLite in-memory, allauth configured).
+- **`settings.py`** — Test Django settings (SQLite in-memory, allauth configured). Installs every optional sub-package (`dj_rest_jwt.mfa`, `.passkeys`, `.registration`) so tests exercise the real app labels and run the shipped migrations.
 - **`mixins.py`** — `TestsMixin` with HTTP helpers and status assertions; custom `APIClient`.
 - **`utils.py`** — `override_api_settings` context manager for temporarily changing `REST_AUTH` values in tests.
-- Test files: `test_api.py`, `test_serializers.py`, `test_social.py`, `test_utils.py`.
+- Test files: `test_api.py`, `test_serializers.py`, `test_social.py`, `test_sso_providers.py`, `test_mfa.py`, `test_passkeys.py`, `test_throttling.py`, `test_captcha.py`, `test_security_hardening.py`, `test_utils.py`.
 
 ## Code Style
 

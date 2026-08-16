@@ -27,8 +27,9 @@ This fork picks opinions:
   verification are throttled from the first request, with no `DEFAULT_THROTTLE_RATES` to configure.
 - **Anti-spam is built in**, not bolted on: a honeypot field is on by default, and
   Turnstile/reCAPTCHA v3/hCaptcha are one setting away.
-- **SSO ships with ready-made Google/GitHub/Microsoft views**, plus the same escape hatch
-  dj-rest-auth offers for any other allauth provider.
+- **SSO ships with ready-made Google/GitHub/Microsoft/Apple views**, plus the same escape hatch
+  dj-rest-auth offers for any other allauth provider - and provider access tokens are
+  audience-checked, so a token minted for someone else's OAuth app can't be used to sign in.
 - **MFA (TOTP) and Passkeys/WebAuthn** are included as opt-in sub-packages.
 
 ## Quick start
@@ -116,6 +117,10 @@ A hidden **honeypot field** (`website` by default) is checked on registration ou
 no configuration, no external dependency. Bots that blindly fill in every form field trip it;
 real users never see it.
 
+> **If your signup form genuinely collects a website**, rename the trap or it will reject those
+> signups as spam: set `HONEYPOT_FIELD_NAME` to something your form never uses, or set
+> `ENABLE_HONEYPOT: False`.
+
 For a hosted CAPTCHA challenge, enable it and pick a backend:
 
 ```python
@@ -141,16 +146,27 @@ settings rather than DRF's `DEFAULT_THROTTLE_RATES` (which most projects never c
 
 ```python
 REST_AUTH = {
-    "RATE_LIMIT_LOGIN": "10/min",              # login + email verification
-    "RATE_LIMIT_REGISTER": "20/hour",          # registration
-    "RATE_LIMIT_PASSWORD_RESET": "5/hour",     # password reset + resend-verification email
-    "RATE_LIMIT_SENSITIVE_ACTION": "30/hour",  # logout, password change
+    "RATE_LIMIT_LOGIN": "10/min",                # login + email verification
+    "RATE_LIMIT_REGISTER": "20/hour",            # registration
+    "RATE_LIMIT_PASSWORD_RESET": "5/hour",       # password reset + resend-verification email
+    "RATE_LIMIT_SENSITIVE_ACTION": "30/hour",    # logout, password change, status reads
+    "RATE_LIMIT_MFA_VERIFY": "5/min",            # second-factor code submission
+    "RATE_LIMIT_CREDENTIAL_ACTION": "20/hour",   # enrolling/removing MFA or a passkey
+    "RATE_LIMIT_PASSKEY_CHALLENGE": "20/min",    # unauthenticated WebAuthn challenges
 }
 ```
 
+`RATE_LIMIT_MFA_VERIFY` buckets by the ephemeral token as well as the client IP, so an attacker
+rotating source addresses doesn't get extra guesses at a 6-digit code.
+
+Throttle state lives in Django's cache - use a shared backend (Redis, Memcached) if you run more
+than one process, or the default per-process `LocMemCache` will multiply every limit by your
+worker count.
+
 ## SSO / social login
 
-Google, GitHub and Microsoft ship as ready-made views - no `adapter_class` subclass required:
+Google, GitHub, Microsoft and Apple ship as ready-made views - no `adapter_class` subclass
+required:
 
 ```python
 # settings.py
@@ -160,6 +176,7 @@ INSTALLED_APPS = [
     "allauth.socialaccount.providers.google",
     "allauth.socialaccount.providers.github",
     "allauth.socialaccount.providers.microsoft",
+    "allauth.socialaccount.providers.apple",
     "dj_rest_jwt.registration",
 ]
 ```
@@ -172,11 +189,29 @@ admin), these endpoints work immediately:
 | `/auth/registration/google/login/`, `.../google/connect/` | Google OAuth2 |
 | `/auth/registration/github/login/`, `.../github/connect/` | GitHub OAuth2 |
 | `/auth/registration/microsoft/login/`, `.../microsoft/connect/` | Microsoft/Entra OAuth2 |
+| `/auth/registration/apple/login/`, `.../apple/connect/` | Sign in with Apple |
 
-Each accepts either `access_token`/`id_token` (client already obtained a token, e.g. via Google
-Identity Services or MSAL) or `code` (server-side authorization code exchange).
+Each accepts either `code` (server-side authorization code exchange) or a token the client already
+obtained, e.g. via Google Identity Services, MSAL, or Apple's native SDK.
 
-Any other allauth provider (Apple, Discord, GitLab, ...) works the same way - see
+### Provider tokens are audience-checked
+
+A bare `access_token` proves the caller holds *a* valid provider token - not that it was issued to
+*your* OAuth app. Left unchecked, anyone with a token minted for any other client can post it and
+be signed in as its owner. So dj-rest-jwt asks the provider who the token belongs to first:
+
+| Client sends | What's checked |
+|---|---|
+| `code` | Redeemed with your client secret - inherently bound to your app |
+| `id_token` | Signed, with an `aud` claim allauth verifies against your client id |
+| `access_token` alone | Google (`tokeninfo`), GitHub (token introspection), Facebook (`debug_token`) |
+
+Microsoft Graph tokens carry no checkable audience, so a bare `access_token` is refused there - use
+`code`. Apple always authenticates through a signed id_token, so nothing extra is needed. Register
+your own check for other providers with `SOCIAL_LOGIN_ACCESS_TOKEN_VERIFIERS`, or opt out entirely
+with `SOCIAL_LOGIN_VERIFY_ACCESS_TOKEN = False` (not recommended).
+
+Any other allauth provider (Discord, GitLab, ...) works the same way - see
 [`dj_rest_jwt/registration/social_views.py`](dj_rest_jwt/registration/social_views.py), which
 doubles as the template: subclass `SocialLoginView`/`SocialConnectView` with that provider's
 `adapter_class`.
@@ -200,6 +235,10 @@ urlpatterns = [
 
 TOTP activation/deactivation, a login-time verification challenge, and recovery codes - see
 [`docs/guides/mfa.md`](docs/guides/mfa.md).
+
+Once installed, the second-factor challenge applies to **every** login path, including social and
+passkey login - not just the password one. Secrets are encrypted at rest, recovery codes are
+stored hashed and shown once, and a TOTP code can never be replayed.
 
 ## Passkeys (WebAuthn)
 
@@ -236,14 +275,25 @@ REST_AUTH = {
     "JWT_AUTH_COOKIE": None,            # e.g. "jwt-access"
     "JWT_AUTH_REFRESH_COOKIE": None,    # e.g. "jwt-refresh"
     "JWT_AUTH_HTTPONLY": True,
-    "JWT_AUTH_SECURE": False,           # set True in production (HTTPS only)
-    "JWT_AUTH_SAMESITE": "Lax",
+    "JWT_AUTH_SECURE": True,            # HTTPS only; set False for local http:// dev
+    "JWT_AUTH_SAMESITE": "Lax",         # if you set "None", also set JWT_AUTH_COOKIE_USE_CSRF
+
+    # Revoke outstanding refresh tokens on password change/reset.
+    # Needs "rest_framework_simplejwt.token_blacklist" in INSTALLED_APPS.
+    "REVOKE_TOKENS_ON_PASSWORD_CHANGE": True,
+
+    # Require password (or a second-factor code) before enrolling/removing a credential
+    "REQUIRE_REAUTH_FOR_CREDENTIAL_CHANGES": True,
+
+    # Reject provider access tokens not issued to this application
+    "SOCIAL_LOGIN_VERIFY_ACCESS_TOKEN": True,
 
     # Rate limiting (see above)
     "RATE_LIMIT_LOGIN": "10/min",
     "RATE_LIMIT_REGISTER": "20/hour",
     "RATE_LIMIT_PASSWORD_RESET": "5/hour",
     "RATE_LIMIT_SENSITIVE_ACTION": "30/hour",
+    "RATE_LIMIT_MFA_VERIFY": "5/min",
 
     # Anti-spam (see above)
     "ENABLE_HONEYPOT": True,

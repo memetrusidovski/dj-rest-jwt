@@ -11,94 +11,68 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from dj_rest_jwt.app_settings import api_settings
+from dj_rest_jwt.throttling import (
+    CredentialActionRateThrottle, MFAVerifyRateThrottle,
+    SensitiveAccountActionRateThrottle,
+)
 from dj_rest_jwt.views import LoginView
 
 from .audit import log_mfa_event
 from .models import Authenticator
 from .recovery_codes import RecoveryCodes
 from .totp import TOTP, build_totp_uri, generate_totp_secret
-from .utils import (create_ephemeral_token, create_totp_activation_token,
-                    is_mfa_enabled)
+from .utils import create_totp_activation_token, is_mfa_enabled
 
 
 class MFALoginView(LoginView):
     """
-    Subclass of LoginView that checks for MFA.
+    Kept for backwards compatibility.
 
-    If the user has MFA enabled, returns an ephemeral token instead of
-    completing login. The client must then POST to mfa/verify/ to exchange
-    the ephemeral token + TOTP code for a real auth token.
+    The MFA challenge now lives in `LoginView` itself, so that every login
+    entry point - social, passkey, anything else subclassing it - is covered
+    rather than just the one URL a project remembered to point here.
     """
-
-    def login(self):
-        self.user = self.serializer.validated_data['user']
-        if is_mfa_enabled(self.user):
-            self.ephemeral_token = create_ephemeral_token(self.user)
-            return
-        super().login()
-
-    def get_response(self):
-        if hasattr(self, 'ephemeral_token'):
-            return Response(
-                {
-                    'ephemeral_token': self.ephemeral_token,
-                    'mfa_required': True,
-                },
-                status=status.HTTP_200_OK,
-            )
-        return super().get_response()
 
 
 @method_decorator(
     sensitive_post_parameters('code', 'ephemeral_token'),
     name='dispatch',
 )
-class MFAVerifyView(GenericAPIView):
-    """Exchange ephemeral_token + TOTP/recovery code for a real auth token."""
+class MFAVerifyView(LoginView):
+    """
+    Exchange ephemeral_token + TOTP/recovery code for a real auth token.
+
+    Subclasses LoginView so token issuance, cookie handling and the response
+    shape are shared with the first-factor endpoint rather than reimplemented.
+    """
     permission_classes = (AllowAny,)
     serializer_class = api_settings.MFA_VERIFY_SERIALIZER
-    throttle_scope = 'dj_rest_jwt_mfa_verify'
+    throttle_classes = (MFAVerifyRateThrottle,)
 
     def get_serializer_class(self):
         return api_settings.MFA_VERIFY_SERIALIZER
 
-    def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+    def mfa_required(self):
+        # This *is* the second factor; challenging again would loop forever.
+        return False
 
-        user = serializer.validated_data['user']
+    def login(self):
+        self.user = self.serializer.validated_data['user']
 
-        # Set backend attribute for django.contrib.auth.login()
-        if not hasattr(user, 'backend'):
+        # django.contrib.auth.login() insists on knowing which backend
+        # authenticated the user, and we got here without going through one.
+        if not hasattr(self.user, 'backend'):
             from django.conf import settings as django_settings
             backends = django_settings.AUTHENTICATION_BACKENDS
-            user.backend = backends[0] if backends else 'django.contrib.auth.backends.ModelBackend'
-
-        # Complete login using the same mechanism as LoginView
-        login_view = LoginView()
-        login_view.request = request
-        login_view.format_kwarg = self.format_kwarg
-        login_view.user = user
-
-        from dj_rest_jwt.models import get_token_model
-        from dj_rest_jwt.utils import jwt_encode
-
-        token_model = get_token_model()
-        if api_settings.USE_JWT:
-            login_view.access_token, login_view.refresh_token = jwt_encode(user)
-        elif token_model:
-            login_view.token = api_settings.TOKEN_CREATOR(
-                token_model, user, serializer,
+            self.user.backend = (
+                backends[0] if backends else 'django.contrib.auth.backends.ModelBackend'
             )
 
-        if api_settings.SESSION_LOGIN:
-            login_view.process_login()
-
-        return login_view.get_response()
+        self.issue_tokens()
 
 
 @method_decorator(
-    sensitive_post_parameters('code', 'activation_token'),
+    sensitive_post_parameters('code', 'activation_token', 'password'),
     name='dispatch',
 )
 class TOTPActivateView(GenericAPIView):
@@ -107,7 +81,7 @@ class TOTPActivateView(GenericAPIView):
     POST: Confirm TOTP activation with activation_token and a valid code.
     """
     permission_classes = (IsAuthenticated,)
-    throttle_scope = 'dj_rest_jwt'
+    throttle_classes = (CredentialActionRateThrottle,)
 
     def get_serializer_class(self):
         if self.request.method == 'GET':
@@ -160,7 +134,13 @@ class TOTPActivateView(GenericAPIView):
         )
 
         return Response(
-            {'recovery_codes': codes},
+            {
+                'recovery_codes': codes,
+                'detail': _(
+                    'Store these recovery codes now. They are shown once and '
+                    'cannot be retrieved again.',
+                ),
+            },
             status=status.HTTP_200_OK,
         )
 
@@ -169,14 +149,14 @@ class TOTPActivateView(GenericAPIView):
         try:
             import qrcode
             import qrcode.image.svg
-            img = qrcode.make(data, image_factory=qrcode.image.svg.SvgImage)
-            buf = io.BytesIO()
-            img.save(buf)
-            import base64
-            svg_b64 = base64.b64encode(buf.getvalue()).decode()
-            return f'data:image/svg+xml;base64,{svg_b64}'
         except ImportError:
             return ''
+        img = qrcode.make(data, image_factory=qrcode.image.svg.SvgImage)
+        buf = io.BytesIO()
+        img.save(buf)
+        import base64
+        svg_b64 = base64.b64encode(buf.getvalue()).decode()
+        return f'data:image/svg+xml;base64,{svg_b64}'
 
 
 @method_decorator(
@@ -186,7 +166,7 @@ class TOTPActivateView(GenericAPIView):
 class TOTPDeactivateView(GenericAPIView):
     """Deactivate TOTP MFA. Requires a valid TOTP code to confirm."""
     permission_classes = (IsAuthenticated,)
-    throttle_scope = 'dj_rest_jwt'
+    throttle_classes = (CredentialActionRateThrottle,)
 
     def get_serializer_class(self):
         return api_settings.MFA_TOTP_DEACTIVATE_SERIALIZER
@@ -225,7 +205,7 @@ class TOTPDeactivateView(GenericAPIView):
 class MFAStatusView(GenericAPIView):
     """Check whether the current user has MFA enabled."""
     permission_classes = (IsAuthenticated,)
-    throttle_scope = 'dj_rest_jwt'
+    throttle_classes = (SensitiveAccountActionRateThrottle,)
 
     def get_serializer_class(self):
         return api_settings.MFA_STATUS_SERIALIZER
@@ -246,12 +226,14 @@ class MFAStatusView(GenericAPIView):
                 'mfa_enabled': True,
                 'created_at': auth.created_at,
                 'last_used_at': last_used_at,
+                'recovery_codes_remaining': RecoveryCodes.get_unused_count(request.user),
             }
         except Authenticator.DoesNotExist:
             data = {
                 'mfa_enabled': False,
                 'created_at': None,
                 'last_used_at': None,
+                'recovery_codes_remaining': 0,
             }
         serializer_class = self.get_serializer_class()
         serializer = serializer_class(instance=data)
@@ -259,27 +241,41 @@ class MFAStatusView(GenericAPIView):
 
 
 class RecoveryCodesView(GenericAPIView):
-    """View unused recovery codes."""
+    """
+    How many recovery codes are left.
+
+    The codes themselves are only ever shown once, when they're generated:
+    they're stored as hashes, so there is nothing here to hand back. Use the
+    regenerate endpoint to get a new set.
+    """
     permission_classes = (IsAuthenticated,)
-    throttle_scope = 'dj_rest_jwt'
+    throttle_classes = (SensitiveAccountActionRateThrottle,)
 
     def get_serializer_class(self):
-        return api_settings.MFA_RECOVERY_CODES_SERIALIZER
+        return api_settings.MFA_RECOVERY_CODES_STATUS_SERIALIZER
 
-    def post(self, request, *args, **kwargs):
-        codes = RecoveryCodes.get_unused_codes(request.user)
+    def get(self, request, *args, **kwargs):
         serializer_class = self.get_serializer_class()
-        serializer = serializer_class(instance={'codes': codes})
+        serializer = serializer_class(instance={
+            'remaining': RecoveryCodes.get_unused_count(request.user),
+        })
         return Response(serializer.data)
 
+    def post(self, request, *args, **kwargs):
+        return self.get(request, *args, **kwargs)
 
+
+@method_decorator(
+    sensitive_post_parameters('password', 'code'),
+    name='dispatch',
+)
 class RecoveryCodesRegenerateView(GenericAPIView):
     """Regenerate recovery codes. Invalidates all previous codes."""
     permission_classes = (IsAuthenticated,)
-    throttle_scope = 'dj_rest_jwt'
+    throttle_classes = (CredentialActionRateThrottle,)
 
     def get_serializer_class(self):
-        return api_settings.MFA_RECOVERY_CODES_SERIALIZER
+        return api_settings.MFA_RECOVERY_CODES_REGENERATE_SERIALIZER
 
     def post(self, request, *args, **kwargs):
         if not is_mfa_enabled(request.user):
@@ -287,6 +283,10 @@ class RecoveryCodesRegenerateView(GenericAPIView):
                 {'detail': _('MFA is not enabled.')},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
         codes = RecoveryCodes.activate(request.user)
         log_mfa_event(
             'recovery_codes_regenerated',
@@ -294,6 +294,10 @@ class RecoveryCodesRegenerateView(GenericAPIView):
             request=request,
             recovery_codes_count=len(codes),
         )
-        serializer_class = self.get_serializer_class()
-        serializer = serializer_class(instance={'codes': codes})
-        return Response(serializer.data)
+        return Response({
+            'codes': codes,
+            'detail': _(
+                'Store these recovery codes now. They are shown once and cannot '
+                'be retrieved again.',
+            ),
+        })

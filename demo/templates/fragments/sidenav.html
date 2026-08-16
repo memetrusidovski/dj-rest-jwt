@@ -1,0 +1,38 @@
+{% comment %}
+Sidebar navigation.
+
+The active link is worked out from `request.resolver_match.url_name` rather than
+a variable each page has to remember to set - the include happens in base.html,
+where a per-page `{% with %}` wouldn't reach it anyway.
+{% endcomment %}
+{% with here=request.resolver_match.url_name %}
+<div class="sidenav__group">
+  <div class="sidenav__label">Account</div>
+  <a href="{% url 'signup' %}" class="{% if here == 'signup' %}is-active{% endif %}">Sign up</a>
+  <a href="{% url 'login' %}" class="{% if here == 'login' %}is-active{% endif %}">Log in</a>
+  <a href="{% url 'logout' %}" class="{% if here == 'logout' %}is-active{% endif %}">Log out</a>
+</div>
+
+<div class="sidenav__group">
+  <div class="sidenav__label">Profile</div>
+  <a href="{% url 'user-details' %}" class="{% if here == 'user-details' %}is-active{% endif %}">User details</a>
+  <a href="{% url 'password-change' %}" class="{% if here == 'password-change' %}is-active{% endif %}">Change password</a>
+</div>
+
+<div class="sidenav__group">
+  <div class="sidenav__label">Two-factor</div>
+  <a href="{% url 'mfa' %}" class="{% if here == 'mfa' %}is-active{% endif %}">TOTP &amp; recovery</a>
+</div>
+
+<div class="sidenav__group">
+  <div class="sidenav__label">Recovery</div>
+  <a href="{% url 'password-reset' %}" class="{% if here == 'password-reset' %}is-active{% endif %}">Reset password</a>
+  <a href="{% url 'password-reset-confirm' %}" class="{% if here == 'password-reset-confirm' or here == 'password_reset_confirm' %}is-active{% endif %}">Confirm reset</a>
+</div>
+
+<div class="sidenav__group">
+  <div class="sidenav__label">Email</div>
+  <a href="{% url 'email-verification' %}" class="{% if here == 'email-verification' %}is-active{% endif %}">Verify email</a>
+  <a href="{% url 'resend-email-verification' %}" class="{% if here == 'resend-email-verification' %}is-active{% endif %}">Resend verification</a>
+</div>
+{% endwith %}

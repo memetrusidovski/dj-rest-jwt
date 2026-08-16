@@ -127,15 +127,50 @@ Response fields:
 
 ### Recovery codes
 
-- `GET /dj-rest-jwt/mfa/recovery-codes/` (list unused codes)
-- `POST /dj-rest-jwt/mfa/recovery-codes/regenerate/` (rotate all codes)
+- `GET /dj-rest-jwt/mfa/recovery-codes/` - how many are left: `{"remaining": 8}`
+- `POST /dj-rest-jwt/mfa/recovery-codes/regenerate/` - rotate all codes
+
+Codes are shown **once**, in the response that generates them (TOTP activation,
+or regeneration). Only their SHA-256 hashes are stored, so there is no endpoint
+that can list them again - show them to the user at generation time and tell
+them to save them.
+
+Regenerating requires step-up re-authentication, because a new set of codes is a
+new set of permanent MFA bypasses:
+
+```json
+POST /dj-rest-jwt/mfa/recovery-codes/regenerate/
+{"password": "the-user-s-current-password"}
+```
+
+A current TOTP or recovery `code` works in place of the password, which matters
+for accounts that sign in through a social provider and have no usable password.
 
 ## Security behavior
 
+- the verify endpoint is rate limited by `RATE_LIMIT_MFA_VERIFY` (default
+  `5/min`), bucketed by the ephemeral token as well as by IP so that rotating
+  source addresses doesn't buy extra guesses at a 6-digit code
 - `ephemeral_token` expires after `MFA_EPHEMERAL_TOKEN_TIMEOUT` (default 300s)
+  and is single-use - it is redeemed the moment a correct code is presented
+  (a wrong code doesn't burn it, so typos don't force a re-login)
+- TOTP codes cannot be replayed: accepting a code burns its time step and every
+  earlier one, under a row lock, so neither a captured code nor two racing
+  requests can be used twice
+- TOTP secrets are encrypted at rest with a key derived from `SECRET_KEY`
+  (requires `cryptography`; see `MFA_ENCRYPT_SECRETS`)
+- recovery codes are stored as hashes; usage is atomic and one-time
+- MFA is enforced on **every** login path - password, social, and passkey - not
+  just the password one
 - activation requires a signed, user-bound `activation_token`
-- recovery code usage is atomic and one-time
-- sensitive MFA events are logged via `dj_rest_jwt.mfa` logger
+- sensitive MFA events are logged via the `dj_rest_jwt.mfa` logger
+
+### Upgrading an existing install
+
+Secrets and recovery codes written by earlier versions are read transparently:
+legacy signed TOTP secrets still work and are re-written encrypted the next time
+a code is verified, and seed-derived recovery codes keep validating until the
+user regenerates. Nobody gets locked out.
 
 ## Settings
 
@@ -148,5 +183,10 @@ REST_AUTH = {
     'MFA_TOTP_PERIOD': 30,
     'MFA_TOTP_ISSUER': '',
     'MFA_RECOVERY_CODE_COUNT': 10,
+    'MFA_TOTP_VALID_WINDOW': 1,
+    'MFA_ENCRYPT_SECRETS': True,
+    'RATE_LIMIT_MFA_VERIFY': '5/min',
+    'RATE_LIMIT_CREDENTIAL_ACTION': '20/hour',
+    'REQUIRE_REAUTH_FOR_CREDENTIAL_CHANGES': True,
 }
 ```

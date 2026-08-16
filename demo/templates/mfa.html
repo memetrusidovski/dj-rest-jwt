@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}Two-factor &middot; dj-rest-jwt demo{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Two-factor authentication</h1>
+    <p>
+      Enrol a TOTP authenticator, then log out and back in to see the challenge. Once TOTP is
+      on it applies to every login path &mdash; password, social and passkey alike.
+    </p>
+    <span class="endpoint"><span class="verb">GET / POST</span>/dj-rest-jwt/mfa/…</span>
+  </div>
+
+  {% include "fragments/session.html" %}
+
+  <div class="split" x-data="mfaPanel()" x-init="if ($store.auth.on) refresh()">
+    <div>
+      <div class="note" x-show="!$store.auth.on" x-cloak>
+        No token held. <a href="{% url 'login' %}">Log in</a> to manage two-factor.
+      </div>
+
+      {# ---- Current state ---- #}
+      <div class="card" x-show="$store.auth.on" x-cloak>
+        <h2 class="card__title">Status</h2>
+        <p class="card__hint">From <code>GET /dj-rest-jwt/mfa/status/</code>.</p>
+
+        <template x-if="status">
+          <div>
+            <div class="note" :class="status.mfa_enabled ? 'note--accent' : ''">
+              <strong x-text="status.mfa_enabled ? 'TOTP is enabled.' : 'TOTP is off.'"></strong>
+              <template x-if="status.mfa_enabled">
+                <span>
+                  Enrolled <span x-text="fmt(status.created_at)"></span>.
+                  Last used <span x-text="fmt(status.last_used_at) || 'never'"></span>.
+                  <span x-text="status.recovery_codes_remaining"></span> recovery codes left.
+                </span>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <div class="actions">
+          <button type="button" class="btn btn--ghost" :disabled="loading" @click="refresh()">Refresh</button>
+          <button type="button" class="btn btn--primary" x-show="status && !status.mfa_enabled"
+                  :disabled="loading" @click="begin()">
+            <span class="spinner" x-show="loading" x-cloak></span>
+            Set up TOTP
+          </button>
+        </div>
+      </div>
+
+      {# ---- Enrolment: scan, then confirm ---- #}
+      <div class="card" x-show="enroll" x-cloak>
+        <h2 class="card__title">Scan this</h2>
+        <p class="card__hint">
+          Add it to your authenticator app, then prove it worked. Nothing is stored until the
+          code below checks out.
+        </p>
+
+        <template x-if="enroll && enroll.qr_code_data_uri">
+          <img class="qr" :src="enroll.qr_code_data_uri" alt="TOTP enrolment QR code">
+        </template>
+
+        <div class="field field--mono">
+          <label>Secret</label>
+          <input type="text" :value="enroll ? enroll.secret : ''" readonly
+                 onclick="this.select()">
+          <small>If you can't scan the code, type this into the app instead.</small>
+        </div>
+
+        <form @submit.prevent="confirm()">
+          <div class="field field--mono">
+            <label for="m-code">Code from the app</label>
+            <input id="m-code" type="text" inputmode="numeric" autocomplete="one-time-code"
+                   placeholder="123456" x-model="code" required>
+          </div>
+
+          <div class="actions">
+            <button type="submit" class="btn btn--primary" :disabled="loading">
+              <span class="spinner" x-show="loading" x-cloak></span>
+              <span x-text="loading ? 'Confirming…' : 'Confirm and enable'"></span>
+            </button>
+            <button type="button" class="btn btn--ghost" @click="enroll = null; code = ''">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      {# ---- Recovery codes: shown once, never retrievable ---- #}
+      <div class="card" x-show="codes" x-cloak>
+        <h2 class="card__title">Recovery codes</h2>
+        <p class="card__hint">
+          Save these now. Only their hashes are stored, so this is the one and only time the
+          API will show them &mdash; there is no endpoint that can list them again.
+        </p>
+        <div class="codes">
+          <template x-for="c in (codes || [])" :key="c"><span x-text="c"></span></template>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn btn--ghost"
+                  @click="navigator.clipboard.writeText((codes || []).join('\n'))">Copy all</button>
+          <button type="button" class="btn btn--ghost" @click="codes = null">Done</button>
+        </div>
+      </div>
+
+      {# ---- Management, once enrolled ---- #}
+      <div class="card" x-show="status && status.mfa_enabled && !enroll" x-cloak>
+        <h2 class="card__title">Manage</h2>
+        <p class="card__hint">
+          Both of these are credential changes, so they need re-authentication rather than
+          just a valid token.
+        </p>
+
+        <div class="field">
+          <label for="m-password">Current password</label>
+          <input id="m-password" type="password" autocomplete="current-password"
+                 placeholder="••••••••" x-model="password">
+          <small>Used to regenerate recovery codes. A current TOTP code works too.</small>
+        </div>
+
+        <div class="field field--mono">
+          <label for="m-code2">TOTP code</label>
+          <input id="m-code2" type="text" inputmode="numeric" placeholder="123456" x-model="code">
+          <small>Required to switch TOTP off.</small>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn btn--ghost" :disabled="loading" @click="regenerate()">
+            Regenerate recovery codes
+          </button>
+          <button type="button" class="btn btn--danger" :disabled="loading" @click="deactivate()">
+            Turn off TOTP
+          </button>
+        </div>
+      </div>
+    </div>
+
+    {% include "fragments/response.html" %}
+  </div>
+{% endblock %}
+
+{% block script %}
+<script>
+  /* All five MFA endpoints share one component so the response panel always
+     shows whichever call you made last. Built on apiForm() for the request,
+     loading and response-formatting plumbing. */
+  function mfaPanel() {
+    const urls = {
+      status:     '{% url 'mfa_status' %}',
+      activate:   '{% url 'mfa_totp_activate' %}',
+      deactivate: '{% url 'mfa_totp_deactivate' %}',
+      regenerate: '{% url 'mfa_recovery_codes_regenerate' %}',
+    };
+
+    /* Note: Object.assign *invokes* getters on the source object rather than
+       copying them, so anything computed (like `ok`) has to live on the object
+       apiForm() returns, not in this literal. */
+    return Object.assign(apiForm({ url: urls.status, auth: true }), {
+      status: null,
+      enroll: null,
+      codes: null,
+      code: '',
+      password: '',
+
+      fmt(value) {
+        return value ? new Date(value).toLocaleString() : '';
+      },
+
+      /* `quiet` re-reads status without stomping the response panel, so after
+         (say) confirming enrolment you still see what that call returned. */
+      async refresh(quiet) {
+        const previous = this.res;
+        await this.send({ url: urls.status, method: 'get' });
+        if (this.ok) this.status = this.res.data;
+        if (quiet && previous) this.res = previous;
+      },
+
+      async begin() {
+        await this.send({ url: urls.activate, method: 'get' });
+        if (this.ok) {
+          this.enroll = this.res.data;
+          this.codes = null;
+        }
+      },
+
+      async confirm() {
+        await this.send({
+          url: urls.activate,
+          replace: true,
+          data: { activation_token: this.enroll.activation_token, code: this.code },
+        });
+        if (this.ok) {
+          this.codes = this.res.data.recovery_codes;
+          this.enroll = null;
+          this.code = '';
+          await this.refresh(true);
+        }
+      },
+
+      async regenerate() {
+        await this.send({
+          url: urls.regenerate,
+          replace: true,
+          data: { password: this.password, code: this.code },
+        });
+        if (this.ok) {
+          this.codes = this.res.data.codes;
+          this.password = '';
+          this.code = '';
+          await this.refresh(true);
+        }
+      },
+
+      async deactivate() {
+        await this.send({ url: urls.deactivate, replace: true, data: { code: this.code } });
+        if (this.ok) {
+          this.code = '';
+          this.codes = null;
+          await this.refresh(true);
+        }
+      },
+    });
+  }
+</script>
+{% endblock %}

@@ -1,3 +1,5 @@
+import logging
+
 from allauth.socialaccount.providers.oauth2.client import OAuth2Error
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -9,7 +11,13 @@ from requests.exceptions import HTTPError
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
+from dj_rest_jwt.app_settings import api_settings
 from dj_rest_jwt.captcha import CaptchaSerializerMixin, HoneypotSerializerMixin
+from dj_rest_jwt.social_verification import (
+    AccessTokenVerificationUnavailable, get_verifier,
+)
+
+logger = logging.getLogger('dj_rest_jwt.social')
 
 try:
     from allauth.account import app_settings as allauth_account_settings
@@ -77,6 +85,46 @@ class SocialLoginSerializer(serializers.Serializer):
         social_login.token = token
         return social_login
 
+    def verify_access_token(self, adapter, app, access_token, id_token=None):
+        """
+        Confirm a client-supplied access token was issued to *this* application.
+
+        Skipped when an `id_token` is present: those are signed and carry an
+        `aud` claim that the provider's adapter verifies against the configured
+        client id, which is a stronger check than anything we could add here.
+        """
+        if not api_settings.SOCIAL_LOGIN_VERIFY_ACCESS_TOKEN or id_token:
+            return
+
+        verifier = get_verifier(adapter.provider_id)
+        if verifier is None:
+            raise serializers.ValidationError(
+                _(
+                    'This provider does not support signing in with a bare '
+                    '"access_token", because the token cannot be proven to have '
+                    'been issued to this application. Send an authorization '
+                    '"code" (or an "id_token", where the provider issues one) '
+                    'instead.'
+                ),
+            )
+
+        try:
+            verified = verifier(app, access_token)
+        except AccessTokenVerificationUnavailable as exc:
+            logger.warning('Could not verify %s access token: %s', adapter.provider_id, exc)
+            raise serializers.ValidationError(
+                _('Could not verify the access token with the provider. Please try again.'),
+            ) from exc
+
+        if not verified:
+            logger.warning(
+                'Rejected %s access token that was not issued to this application.',
+                adapter.provider_id,
+            )
+            raise serializers.ValidationError(
+                _('The access token was not issued to this application.'),
+            )
+
     def set_callback_url(self, view, adapter_class):
         # first set url from view
         self.callback_url = getattr(view, 'callback_url', None)
@@ -121,6 +169,7 @@ class SocialLoginSerializer(serializers.Serializer):
             id_token = attrs.get('id_token')
             if id_token:
                 tokens_to_parse['id_token'] = id_token
+            self.verify_access_token(adapter, app, access_token, id_token=id_token)
 
         # Case 2: We received the authorization code
         elif code:
@@ -161,7 +210,16 @@ class SocialLoginSerializer(serializers.Serializer):
                 _('Incorrect input. access_token or code is required.'),
             )
 
-        social_token = adapter.parse_token(tokens_to_parse)
+        try:
+            # For providers that authenticate through a signed id_token (Apple,
+            # and Google when one is supplied) this is where the signature and
+            # audience are actually checked, so a forged or expired token
+            # surfaces here - as a 400, not an unhandled 500.
+            social_token = adapter.parse_token(tokens_to_parse)
+        except (OAuth2Error, KeyError, ValueError) as ex:
+            raise serializers.ValidationError(
+                _('Invalid or expired provider token.'),
+            ) from ex
         social_token.app = app
 
         try:
@@ -170,7 +228,7 @@ class SocialLoginSerializer(serializers.Serializer):
             else:
                 login = self.get_social_login(adapter, app, social_token, token)
             ret = complete_social_login(request, login)
-        except HTTPError:
+        except (HTTPError, OAuth2Error):
             raise serializers.ValidationError(_('Incorrect value'))
 
         if isinstance(ret, HttpResponseBadRequest):

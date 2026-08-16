@@ -1,8 +1,40 @@
 {% extends "base.html" %}
+{% block title %}Resend verification &middot; dj-rest-jwt demo{% endblock %}
 
 {% block content %}
-  <div class="row">
-    <h3>Resend E-mail verification</h3><hr/>
-    {% include "fragments/resend_email_verification_form.html" %}
+  <div class="page-head">
+    <h1>Resend verification</h1>
+    <p>
+      Send the confirmation email again. Like password reset, the response is the same
+      whether or not the address exists.
+    </p>
+    <span class="endpoint"><span class="verb">POST</span>{% url 'rest_resend_email' %}</span>
+  </div>
+
+  <div class="split"
+       x-data="apiForm({ url: '{% url 'rest_resend_email' %}', fields: { email: '' } })">
+
+    <div class="card">
+      <h2 class="card__title">Address</h2>
+      <p class="card__hint">Nothing is sent if the address is already verified.</p>
+
+      <form @submit.prevent="send()">
+        <div class="field">
+          <label for="rv-email">Email</label>
+          <input id="rv-email" type="email" autocomplete="email" placeholder="you@example.com"
+                 x-model="fields.email" required>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn btn--primary" :disabled="loading">
+            <span class="spinner" x-show="loading" x-cloak></span>
+            <span x-text="loading ? 'Sending…' : 'Resend'"></span>
+          </button>
+          <button type="button" class="btn btn--ghost" @click="reset()">Clear</button>
+        </div>
+      </form>
+    </div>
+
+    {% include "fragments/response.html" %}
   </div>
 {% endblock %}

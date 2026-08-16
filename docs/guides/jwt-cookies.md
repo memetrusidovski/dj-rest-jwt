@@ -54,7 +54,7 @@ REST_AUTH = {
     'JWT_AUTH_COOKIE': 'access',
     'JWT_AUTH_REFRESH_COOKIE': 'refresh',
     'JWT_AUTH_HTTPONLY': True,
-    'JWT_AUTH_SECURE': False,  # True in production!
+    'JWT_AUTH_SECURE': True,  # default; set False only for local http://
     'JWT_AUTH_SAMESITE': 'Lax',
     'JWT_AUTH_RETURN_EXPIRATION': True,
 }
@@ -289,6 +289,26 @@ REST_AUTH = {
 | `'Strict'` | Only same-site requests | Maximum security, may break some flows |
 | `'Lax'` | Same-site + top-level navigations | Good balance of security and usability |
 | `'None'` | All requests (requires `Secure`) | Cross-origin APIs (with CORS) |
+
+!!! danger "SameSite='None' turns off your CSRF protection"
+    `Lax` is what stops another site making authenticated requests with your
+    auth cookie. `JWTCookieAuthentication` performs no CSRF check of its own by
+    default, so setting `SameSite='None'` without also enabling one leaves the
+    API open to cross-site request forgery.
+
+    If you need `'None'` for a cross-origin SPA, pair it with:
+
+    ```python
+    REST_AUTH = {
+        'JWT_AUTH_SAMESITE': 'None',
+        'JWT_AUTH_SECURE': True,
+        'JWT_AUTH_COOKIE_USE_CSRF': True,   # <- required
+    }
+    ```
+
+    Your client then has to send the `X-CSRFToken` header, as it would for
+    Django's session auth. `manage.py check` warns (`dj_rest_jwt.W001`) if you
+    set `'None'` without it.
 
 ---
 

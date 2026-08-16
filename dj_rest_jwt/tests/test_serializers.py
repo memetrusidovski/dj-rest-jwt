@@ -8,11 +8,12 @@ from django.test import TestCase, modify_settings, override_settings
 from django.contrib.sites.models import Site
 from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APIRequestFactory, force_authenticate
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from dj_rest_jwt.serializers import PasswordChangeSerializer, UserDetailsSerializer
 from dj_rest_jwt.registration.serializers import SocialLoginSerializer
 from dj_rest_jwt.registration.views import SocialLoginView
+from dj_rest_jwt.tests.utils import override_api_settings
 
 
 User = get_user_model()
@@ -149,5 +150,58 @@ class TestSocialLoginSerializer(TestCase):
         dummy_view = SocialLoginView()
         dummy_view.adapter_class = FacebookOAuth2Adapter
         serializer = SocialLoginSerializer(data=self.request_data, context={'request': self.request, 'view': dummy_view})
-        serializer.is_valid()
+        # This test is about the provider API failing, not about audience
+        # checks - those get their own tests below.
+        with override_api_settings(SOCIAL_LOGIN_VERIFY_ACCESS_TOKEN=False):
+            serializer.is_valid()
         self.assertDictEqual(serializer.errors, self.INCORRECT_VALUE)
+
+    def test_bare_access_token_rejected_when_not_issued_to_this_app(self):
+        dummy_view = SocialLoginView()
+        dummy_view.adapter_class = FacebookOAuth2Adapter
+        serializer = SocialLoginSerializer(
+            data=self.request_data, context={'request': self.request, 'view': dummy_view},
+        )
+        with patch(
+            'dj_rest_jwt.registration.serializers.get_verifier',
+            return_value=lambda app, token: False,
+        ):
+            serializer.is_valid()
+        self.assertEqual(
+            serializer.errors,
+            {'non_field_errors': [
+                ErrorDetail('The access token was not issued to this application.', code='invalid'),
+            ]},
+        )
+
+    def test_bare_access_token_rejected_for_provider_without_verifier(self):
+        """
+        A provider we can't audience-check must not silently fall back to
+        trusting the token.
+        """
+        dummy_view = SocialLoginView()
+        dummy_view.adapter_class = FacebookOAuth2Adapter
+        serializer = SocialLoginSerializer(
+            data=self.request_data, context={'request': self.request, 'view': dummy_view},
+        )
+        with override_api_settings(SOCIAL_LOGIN_ACCESS_TOKEN_VERIFIERS={}):
+            serializer.is_valid()
+        self.assertIn('does not support signing in with a bare', str(serializer.errors))
+
+    def test_provider_unreachable_is_not_a_free_pass(self):
+        from dj_rest_jwt.social_verification import AccessTokenVerificationUnavailable
+
+        def unavailable(app, token):
+            raise AccessTokenVerificationUnavailable('boom')
+
+        dummy_view = SocialLoginView()
+        dummy_view.adapter_class = FacebookOAuth2Adapter
+        serializer = SocialLoginSerializer(
+            data=self.request_data, context={'request': self.request, 'view': dummy_view},
+        )
+        with patch(
+            'dj_rest_jwt.registration.serializers.get_verifier',
+            return_value=unavailable,
+        ):
+            serializer.is_valid()
+        self.assertIn('Could not verify the access token', str(serializer.errors))

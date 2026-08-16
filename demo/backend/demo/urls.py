@@ -1,7 +1,6 @@
 from django.urls import include, re_path
 from django.contrib import admin
 from django.views.generic import RedirectView, TemplateView
-from dj_rest_jwt.mfa.views import MFALoginView
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
@@ -39,6 +38,8 @@ urlpatterns = [
     re_path(r'^resend-email-verification/$',
         TemplateView.as_view(template_name="resend_email_verification.html"),
         name='resend-email-verification'),
+    re_path(r'^mfa/$', TemplateView.as_view(template_name="mfa.html"),
+        name='mfa'),
 
 
     # this url is used to generate email content
@@ -46,7 +47,8 @@ urlpatterns = [
         TemplateView.as_view(template_name="password_reset_confirm.html"),
         name='password_reset_confirm'),
 
-    re_path(r'^dj-rest-jwt/login/$', MFALoginView.as_view(), name='rest_login'),
+    # No MFALoginView override needed: LoginView itself issues the second-factor
+    # challenge, so the stock login route covers it.
     re_path(r'^dj-rest-jwt/', include('dj_rest_jwt.urls')),
     re_path(r'^dj-rest-jwt/registration/', include('dj_rest_jwt.registration.urls')),
     re_path(r'^dj-rest-jwt/', include('dj_rest_jwt.mfa.urls')),

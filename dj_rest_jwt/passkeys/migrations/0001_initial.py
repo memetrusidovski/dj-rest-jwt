@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(max_length=255)),
-                ('credential_id', models.BinaryField(unique=True)),
+                ('credential_id', models.CharField(max_length=512, unique=True)),
                 ('public_key', models.BinaryField()),
                 ('sign_count', models.PositiveIntegerField(default=0)),
                 ('transports', models.JSONField(blank=True, default=list)),

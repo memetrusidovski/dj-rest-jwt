@@ -29,7 +29,7 @@ Building authentication for your API shouldn't require reinventing the wheel. **
 
     ---
 
-    HTTP-only JWT cookies, token blacklisting, throttling, and CSRF protection built-in.
+    HTTP-only, Secure JWT cookies; rate limits on every endpoint from the first request; MFA and passkeys; token revocation on password change.
 
     [:octicons-arrow-right-24: Security options](guides/jwt-cookies.md)
 

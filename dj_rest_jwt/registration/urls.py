@@ -33,8 +33,8 @@ urlpatterns = [
 
 if 'allauth.socialaccount' in settings.INSTALLED_APPS:
     from .social_views import (
-        GitHubConnect, GitHubLogin, GoogleConnect, GoogleLogin,
-        MicrosoftConnect, MicrosoftLogin,
+        AppleConnect, AppleLogin, GitHubConnect, GitHubLogin, GoogleConnect,
+        GoogleLogin, MicrosoftConnect, MicrosoftLogin,
     )
 
     # Named rest_<provider>_* (not e.g. "google_login") to avoid colliding with
@@ -47,4 +47,6 @@ if 'allauth.socialaccount' in settings.INSTALLED_APPS:
         re_path(r'github/connect/?$', GitHubConnect.as_view(), name='rest_github_connect'),
         re_path(r'microsoft/login/?$', MicrosoftLogin.as_view(), name='rest_microsoft_login'),
         re_path(r'microsoft/connect/?$', MicrosoftConnect.as_view(), name='rest_microsoft_connect'),
+        re_path(r'apple/login/?$', AppleLogin.as_view(), name='rest_apple_login'),
+        re_path(r'apple/connect/?$', AppleConnect.as_view(), name='rest_apple_connect'),
     ]

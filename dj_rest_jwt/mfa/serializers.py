@@ -4,15 +4,18 @@ from django.core.signing import BadSignature, SignatureExpired
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
+from dj_rest_jwt.reauth import ReauthSerializerMixin
+
 from .audit import log_mfa_event
 from .recovery_codes import RecoveryCodes
 from .totp import TOTP, validate_totp_code
-from .utils import verify_ephemeral_token, verify_totp_activation_token
+from .utils import (EphemeralTokenConsumed, consume_ephemeral_token,
+                    verify_ephemeral_token, verify_totp_activation_token)
 
 
 class MFAVerifySerializer(serializers.Serializer):
     ephemeral_token = serializers.CharField(required=True)
-    code = serializers.CharField(required=True, max_length=9)
+    code = serializers.CharField(required=True, max_length=16)
 
     def validate(self, attrs):
         request = self.context.get('request')
@@ -27,6 +30,16 @@ class MFAVerifySerializer(serializers.Serializer):
             )
             raise serializers.ValidationError(
                 {'ephemeral_token': _('Invalid or expired token.')},
+            )
+        except EphemeralTokenConsumed:
+            log_mfa_event(
+                'verify_failed',
+                request=request,
+                level=logging.WARNING,
+                reason='token_already_used',
+            )
+            raise serializers.ValidationError(
+                {'ephemeral_token': _('This token has already been used. Please log in again.')},
             )
 
         if not user.is_active:
@@ -43,6 +56,7 @@ class MFAVerifySerializer(serializers.Serializer):
 
         code = attrs['code']
         if TOTP.validate_code(user, code):
+            consume_ephemeral_token(attrs['ephemeral_token'])
             log_mfa_event(
                 'totp_verified',
                 user=user,
@@ -52,10 +66,12 @@ class MFAVerifySerializer(serializers.Serializer):
             return attrs
 
         if RecoveryCodes.validate_code(user, code):
+            consume_ephemeral_token(attrs['ephemeral_token'])
             log_mfa_event(
                 'recovery_code_used',
                 user=user,
                 request=request,
+                recovery_codes_remaining=RecoveryCodes.get_unused_count(user),
             )
             attrs['user'] = user
             return attrs
@@ -150,7 +166,18 @@ class MFAStatusSerializer(serializers.Serializer):
     mfa_enabled = serializers.BooleanField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True, allow_null=True)
     last_used_at = serializers.DateTimeField(read_only=True, allow_null=True)
+    recovery_codes_remaining = serializers.IntegerField(read_only=True)
 
 
-class RecoveryCodesSerializer(serializers.Serializer):
-    codes = serializers.ListField(child=serializers.CharField(), read_only=True)
+class RecoveryCodesStatusSerializer(serializers.Serializer):
+    """
+    Deliberately has no `codes` field.
+
+    Recovery codes are stored as hashes and shown once at generation time, so
+    there is nothing to hand back here - only how many are left.
+    """
+    remaining = serializers.IntegerField(read_only=True)
+
+
+class RecoveryCodesRegenerateSerializer(ReauthSerializerMixin, serializers.Serializer):
+    """Rotating recovery codes mints new bypass credentials, so it needs step-up auth."""

@@ -9,7 +9,11 @@ class WebAuthnCredential(models.Model):
         related_name='webauthn_credentials',
     )
     name = models.CharField(max_length=255)
-    credential_id = models.BinaryField(unique=True)
+    # Stored base64url-encoded rather than as a BinaryField: MySQL and MariaDB
+    # can't put a unique index on a BLOB without a prefix length, and the unique
+    # constraint is what stops one authenticator being registered to two
+    # accounts.
+    credential_id = models.CharField(max_length=512, unique=True)
     public_key = models.BinaryField()
     sign_count = models.PositiveIntegerField(default=0)
     transports = models.JSONField(default=list, blank=True)

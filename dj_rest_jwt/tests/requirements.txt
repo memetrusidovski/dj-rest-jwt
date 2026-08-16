@@ -1,8 +1,10 @@
 coveralls==1.11.1
+cryptography>=41.0.0
 django-allauth[socialaccount]~=65.14.1
 djangorestframework-simplejwt~=5.5.1
 flake8==7.1.1
 pyotp~=2.9.0
+qrcode>=7.4.0
 responses==0.12.1
 unittest-xml-reporting==3.2.0
 webauthn>=2.0.0

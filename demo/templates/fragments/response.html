@@ -1,0 +1,17 @@
+{% comment %}
+The raw API response. Included inside a component created by apiForm(), so it
+reads `res`, `statusClass` and `pretty` straight off that scope.
+{% endcomment %}
+<div class="response">
+  <div class="response__bar">
+    <h3>API response</h3>
+    <span class="status" :class="statusClass" x-show="res" x-cloak
+          x-text="res ? (res.status === 0 ? 'network error' : res.status) : ''"></span>
+  </div>
+  <template x-if="!res">
+    <div class="response__empty">Submit the form to see what the API returns.</div>
+  </template>
+  <template x-if="res">
+    <pre x-text="pretty"></pre>
+  </template>
+</div>

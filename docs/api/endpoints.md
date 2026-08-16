@@ -480,6 +480,25 @@ POST /dj-rest-jwt/{provider}/
 !!! note "Provider-specific Fields"
     Different providers may require different fields. See the [Social Auth Guide](../guides/social-auth.md) for provider-specific examples.
 
+!!! warning "Bare access tokens are audience-checked"
+    An `access_token` on its own carries no proof of which OAuth application it
+    was issued to, so anyone holding a token minted for *any* client could
+    otherwise sign in as its owner. dj-rest-jwt verifies the token's audience
+    with the provider before trusting it, and rejects providers where that isn't
+    possible. See [Social Authentication](../guides/social-auth.md#access-token-verification).
+
+Ready-made views ship for Google, GitHub, Microsoft and Apple:
+
+```
+POST /dj-rest-jwt/registration/google/login/
+POST /dj-rest-jwt/registration/github/login/
+POST /dj-rest-jwt/registration/microsoft/login/
+POST /dj-rest-jwt/registration/apple/login/
+```
+
+with a matching `.../connect/` endpoint for each, to link a provider account to
+an already-authenticated user.
+
 ---
 
 ## MFA Endpoints
@@ -518,6 +537,13 @@ GET  /dj-rest-jwt/mfa/recovery-codes/
 POST /dj-rest-jwt/mfa/recovery-codes/regenerate/
 ```
 
+`GET` returns only `{"remaining": <int>}`. Codes are stored as hashes and shown
+exactly once, when they are generated - there is nothing to hand back.
+
+`regenerate` returns a fresh set in `codes` and invalidates the previous ones. It
+requires step-up re-authentication: send `password` (or a current second-factor
+`code`) alongside the request.
+
 ---
 
 ## Passkey Endpoints
@@ -538,7 +564,9 @@ Authentication required. Returns WebAuthn `PublicKeyCredentialCreationOptions`.
 POST /dj-rest-jwt/passkeys/register/complete/
 ```
 
-Authentication required. Verifies and stores the credential (201 Created).
+Authentication required, plus step-up re-authentication: send `password` (or a
+current second-factor `code`) alongside `credential`. Verifies and stores the
+credential (201 Created).
 
 ### Passkey Login Begin
 
@@ -574,6 +602,9 @@ DELETE /dj-rest-jwt/passkeys/{id}/
 
 Authentication required. Retrieve, rename, or delete an individual passkey.
 
+`DELETE` also requires step-up re-authentication - send `password` (or a current
+second-factor `code`) in the request body.
+
 ---
 
 ## Response Status Codes
@@ -593,15 +624,42 @@ Authentication required. Retrieve, rename, or delete an individual passkey.
 
 ## Throttling
 
-All authentication views use the `dj_rest_jwt` throttle scope. Configure in your settings:
+Every auth endpoint is rate limited out of the box, from dj-rest-jwt's own
+settings rather than DRF's `DEFAULT_THROTTLE_RATES`. There is nothing to wire up
+and no `ScopedRateThrottle` to register.
 
-```python
-REST_FRAMEWORK = {
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.ScopedRateThrottle',
-    ],
-    'DEFAULT_THROTTLE_RATES': {
-        'dj_rest_jwt': '100/hour',
-    },
+```python title="settings.py"
+REST_AUTH = {
+    'RATE_LIMIT_LOGIN': '10/min',
+    'RATE_LIMIT_REGISTER': '20/hour',
+    'RATE_LIMIT_PASSWORD_RESET': '5/hour',
+    'RATE_LIMIT_SENSITIVE_ACTION': '30/hour',   # logout, password change, reads
+    'RATE_LIMIT_MFA_VERIFY': '5/min',           # second-factor code submission
+    'RATE_LIMIT_CREDENTIAL_ACTION': '20/hour',  # enrolling/removing MFA or a passkey
+    'RATE_LIMIT_PASSKEY_CHALLENGE': '20/min',   # unauthenticated WebAuthn challenges
 }
+```
+
+Set any of them to `None` to disable throttling for that group of endpoints.
+
+`RATE_LIMIT_MFA_VERIFY` buckets by the ephemeral token as well as by IP, so
+rotating source addresses doesn't buy an attacker extra guesses at one account's
+6-digit code.
+
+To apply a different limit to a specific view, set `throttle_classes` on it -
+note that a bare `throttle_scope` attribute does nothing unless your project has
+also registered DRF's `ScopedRateThrottle`:
+
+```python title="views.py"
+from dj_rest_jwt.throttling import ConfigurableRateThrottle
+from dj_rest_jwt.views import LoginView
+
+
+class StrictLoginThrottle(ConfigurableRateThrottle):
+    scope = 'myapp_strict_login'
+    rate_setting_name = 'RATE_LIMIT_LOGIN'
+
+
+class StrictLoginView(LoginView):
+    throttle_classes = (StrictLoginThrottle,)
 ```

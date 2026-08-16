@@ -12,6 +12,8 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from rest_framework import status
 
+from dj_rest_jwt.social_verification import FACEBOOK_GRAPH_URL
+
 from .mixins import TestsMixin
 from .utils import override_api_settings
 
@@ -38,6 +40,26 @@ def _has_oauth_query_bug():
         return 'sess.request(\n                url,' in source or 'sess.request(url,' in source
     except Exception:
         return False
+
+
+FACEBOOK_APP_ID = '123123123'
+
+
+def mock_facebook_token_introspection(app_id=FACEBOOK_APP_ID, is_valid=True):
+    """
+    Stub Facebook's debug_token endpoint.
+
+    Bare provider access tokens are now checked against the app they were
+    issued to before we'll trust them, so every test that logs in with one has
+    to answer that question.
+    """
+    responses.add(
+        responses.GET,
+        FACEBOOK_GRAPH_URL + '/debug_token',
+        body=json.dumps({'data': {'app_id': app_id, 'is_valid': is_valid}}),
+        status=200,
+        content_type='application/json',
+    )
 
 
 _skip_twitter_oauth = unittest.skipIf(
@@ -85,6 +107,7 @@ class TestSocialAuth(TestsMixin, TestCase):
     @responses.activate
     def test_failed_social_auth(self):
         # fake response
+        mock_facebook_token_introspection()
         responses.add(
             responses.GET,
             self.graph_api_url,
@@ -115,6 +138,7 @@ class TestSocialAuth(TestsMixin, TestCase):
             'verified': True,
         }
 
+        mock_facebook_token_introspection()
         responses.add(
             responses.GET,
             self.graph_api_url,
@@ -276,6 +300,7 @@ class TestSocialAuth(TestsMixin, TestCase):
             'email': self.EMAIL,
         }
 
+        mock_facebook_token_introspection()
         responses.add(
             responses.GET,
             self.graph_api_url,
@@ -318,6 +343,7 @@ class TestSocialAuth(TestsMixin, TestCase):
     @override_api_settings(USE_JWT=True)
     def test_jwt(self):
         resp_body = '{"id":"123123123123","first_name":"John","gender":"male","last_name":"Smith","link":"https:\\/\\/www.facebook.com\\/john.smith","locale":"en_US","name":"John Smith","timezone":2,"updated_time":"2014-08-13T10:14:38+0000","username":"john.smith","verified":true}'  # noqa
+        mock_facebook_token_introspection()
         responses.add(
             responses.GET,
             self.graph_api_url,
@@ -376,6 +402,7 @@ class TestSocialConnectAuth(TestsMixin, TestCase):
 
     @responses.activate
     def test_social_connect_no_auth(self):
+        mock_facebook_token_introspection()
         responses.add(
             responses.GET,
             self.graph_api_url,
@@ -416,6 +443,7 @@ class TestSocialConnectAuth(TestsMixin, TestCase):
             'verified': True,
         }
 
+        mock_facebook_token_introspection()
         responses.add(
             responses.GET,
             self.graph_api_url,

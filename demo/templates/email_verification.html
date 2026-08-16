@@ -1,8 +1,39 @@
 {% extends "base.html" %}
+{% block title %}Verify email &middot; dj-rest-jwt demo{% endblock %}
 
 {% block content %}
-  <div class="row">
-    <h3>E-mail verification</h3><hr/>
-    {% include "fragments/email_verification_form.html" %}
+  <div class="page-head">
+    <h1>Verify email</h1>
+    <p>Redeem the confirmation key from the verification email.</p>
+    <span class="endpoint"><span class="verb">POST</span>{% url 'rest_verify_email' %}</span>
+  </div>
+
+  <div class="split"
+       x-data="apiForm({ url: '{% url 'rest_verify_email' %}', fields: { key: '' } })">
+
+    <div class="card">
+      <h2 class="card__title">Confirmation key</h2>
+      <p class="card__hint">
+        Printed to the server console along with the rest of the email &mdash; it's the last
+        path segment of the <code>/account/confirm-email/&lt;key&gt;/</code> link.
+      </p>
+
+      <form @submit.prevent="send()">
+        <div class="field field--mono">
+          <label for="v-key">key</label>
+          <input id="v-key" type="text" placeholder="MQ:1abc2d:…" x-model="fields.key" required>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn btn--primary" :disabled="loading">
+            <span class="spinner" x-show="loading" x-cloak></span>
+            <span x-text="loading ? 'Verifying…' : 'Verify'"></span>
+          </button>
+          <button type="button" class="btn btn--ghost" @click="reset()">Clear</button>
+        </div>
+      </form>
+    </div>
+
+    {% include "fragments/response.html" %}
   </div>
 {% endblock %}

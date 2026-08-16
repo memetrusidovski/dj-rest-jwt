@@ -11,18 +11,23 @@ https://docs.djangoproject.com/en/1.7/ref/settings/
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
 
+from django.core.management.utils import get_random_secret_key
+
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/1.7/howto/deployment/checklist/
+# The HTML pages live in demo/templates, one level above the Django project
+# (demo/backend), so that the SPA client and this server-rendered tour of the
+# API sit side by side under demo/.
+DEMO_DIR = os.path.dirname(BASE_DIR)
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'ma3c@7uu!%e0=tynp+i6+q%$)9v@$t(eulqurym_b=48z82&5n'
+# This project exists to demo the package locally. It is not a deployment
+# template - see ../../starter for that - but it still shouldn't ship a
+# checked-in secret key or answer to every Host header.
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or get_random_secret_key()
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', '1') == '1'
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
 
 # Application definition
 
@@ -36,6 +41,8 @@ INSTALLED_APPS = (
     'django.contrib.sites',
     'rest_framework',
     'rest_framework.authtoken',
+    # Gives password change/reset somewhere to record a revocation.
+    'rest_framework_simplejwt.token_blacklist',
     'dj_rest_jwt',
     'allauth',
     'allauth.account',
@@ -100,7 +107,7 @@ STATIC_URL = '/static/'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates'), ],
+        'DIRS': [os.path.join(DEMO_DIR, 'templates'), ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -129,7 +136,7 @@ REST_AUTH = {
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 SITE_ID = 1
-ACCOUNT_EMAIL_REQUIRED = False
+ACCOUNT_SIGNUP_FIELDS = ['email', 'username*', 'password1*', 'password2*']
 ACCOUNT_LOGIN_METHODS = {'username'}
 ACCOUNT_EMAIL_VERIFICATION = 'optional'
 

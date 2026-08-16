@@ -1,9 +1,45 @@
 {% extends "base.html" %}
+{% block title %}dj-rest-jwt demo{% endblock %}
 
 {% block content %}
-  <!-- Main jumbotron for a primary marketing message or call to action -->
-  <div class="jumbotron">
-    <h1>dj-rest-jwt demo</h1>
-    <p>Welcome in dj-rest-jwt demo project!</p>
+  <div class="page-head">
+    <h1>Every auth endpoint, live</h1>
+    <p>
+      This project wires <strong>dj-rest-jwt</strong> up against a real Django backend and
+      calls it from the browser with Alpine.js and axios. Pick an endpoint from the sidebar,
+      submit the form, and read exactly what the API sent back.
+    </p>
+  </div>
+
+  {% include "fragments/session.html" %}
+
+  <div class="card">
+    <h2 class="card__title">Start here</h2>
+    <p class="card__hint">The shortest path through the demo.</p>
+    <ol style="margin: 0; padding-left: 20px; color: var(--text-muted); font-size: 14px; line-height: 2;">
+      <li><a href="{% url 'signup' %}">Sign up</a> &mdash; creates a user and returns a token.</li>
+      <li><a href="{% url 'login' %}">Log in</a> &mdash; the token is remembered for every other page.</li>
+      <li><a href="{% url 'user-details' %}">User details</a> &mdash; the first authenticated request.</li>
+      <li><a href="{% url 'mfa' %}">Turn on two-factor</a>, then log in again to see the challenge.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2 class="card__title">How this demo is configured</h2>
+    <p class="card__hint">
+      Set in <code>demo/backend/demo/settings.py</code> &mdash; worth knowing, because it
+      changes what the responses look like.
+    </p>
+    <div class="note">
+      <strong>Token auth, not JWT.</strong> This demo pins
+      <code>USE_JWT&nbsp;=&nbsp;False</code> with a <code>TOKEN_MODEL</code>, so logging in
+      returns <code>{"key": "..."}</code> and requests carry
+      <code>Authorization: Token&nbsp;&lt;key&gt;</code>. The package's own default is
+      JWT-only &mdash; see the SPA client in <code>demo/spa-client</code> for that flow.
+    </div>
+    <div class="note" style="margin-top: 10px;">
+      <strong>Emails go to the console.</strong> Password-reset and verification links are
+      printed in the terminal running <code>manage.py runserver</code>, not sent anywhere.
+    </div>
   </div>
 {% endblock %}

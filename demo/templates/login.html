@@ -1,8 +1,98 @@
 {% extends "base.html" %}
+{% block title %}Log in &middot; dj-rest-jwt demo{% endblock %}
 
 {% block content %}
-  <div class="row">
-    <h3>Login</h3><hr/>
-    {% include "fragments/login_form.html" %}
+  <div class="page-head">
+    <h1>Log in</h1>
+    <p>
+      Exchange credentials for an auth token. If the account has TOTP enrolled the API answers
+      with an ephemeral token instead, and the second-factor step appears below.
+    </p>
+    <span class="endpoint"><span class="verb">POST</span>{% url 'rest_login' %}</span>
+  </div>
+
+  {% include "fragments/session.html" %}
+
+  {% comment %}
+  One component drives both steps: the login POST and, if the API asks for it, the
+  second-factor exchange. `onSuccess` fires for both, and tells them apart by what
+  came back - an ephemeral token means "not done yet", a key means "you're in".
+  {% endcomment %}
+  <div class="split"
+       x-data="Object.assign(
+         apiForm({
+           url: '{% url 'rest_login' %}',
+           fields: { username: '', password: '' },
+           onSuccess(data, self) {
+             if (data.mfa_required) {
+               self.ephemeral = data.ephemeral_token;
+             } else if (data.key) {
+               Alpine.store('auth').set(data.key, self.fields.username);
+               self.ephemeral = null;
+               self.code = '';
+             }
+           }
+         }),
+         { ephemeral: null, code: '' }
+       )">
+
+    <div>
+      <div class="card">
+        <h2 class="card__title">Credentials</h2>
+        <p class="card__hint">This project is configured to authenticate by username.</p>
+
+        <form @submit.prevent="ephemeral = null; send()">
+          <div class="field">
+            <label for="username">Username</label>
+            <input id="username" type="text" autocomplete="username" placeholder="yourname"
+                   x-model="fields.username" required>
+          </div>
+
+          <div class="field">
+            <label for="password">Password</label>
+            <input id="password" type="password" autocomplete="current-password" placeholder="••••••••"
+                   x-model="fields.password" required>
+          </div>
+
+          <div class="actions">
+            <button type="submit" class="btn btn--primary" :disabled="loading">
+              <span class="spinner" x-show="loading" x-cloak></span>
+              <span x-text="loading ? 'Signing in…' : 'Log in'"></span>
+            </button>
+            <button type="button" class="btn btn--ghost" @click="reset(); ephemeral = null; code = ''">Clear</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card" x-show="ephemeral" x-cloak>
+        <h2 class="card__title">Two-factor required</h2>
+        <p class="card__hint">
+          Enter the code from your authenticator app, or one of your recovery codes.
+        </p>
+
+        <form @submit.prevent="send({
+                url: '{% url 'mfa_verify' %}',
+                replace: true,
+                data: { ephemeral_token: ephemeral, code: code }
+              })">
+          <div class="field field--mono">
+            <label for="mfa-code">Code</label>
+            <input id="mfa-code" type="text" inputmode="numeric" autocomplete="one-time-code"
+                   placeholder="123456" x-model="code" required>
+            <small>A wrong code doesn't burn the challenge &mdash; you can retry until it expires.</small>
+          </div>
+
+          <div class="actions">
+            <button type="submit" class="btn btn--primary" :disabled="loading">
+              <span class="spinner" x-show="loading" x-cloak></span>
+              <span x-text="loading ? 'Verifying…' : 'Verify'"></span>
+            </button>
+            <button type="button" class="btn btn--ghost" @click="ephemeral = null; code = ''">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    {% include "fragments/response.html" %}
   </div>
 {% endblock %}

@@ -28,6 +28,12 @@ sensitive_post_parameters_m = method_decorator(
 )
 
 
+def mfa_app_installed():
+    """Whether the optional `dj_rest_jwt.mfa` app is part of this project."""
+    from django.apps import apps
+    return apps.is_installed('dj_rest_jwt.mfa')
+
+
 class LoginView(GenericAPIView):
     """
     Check the credentials and return the REST Token
@@ -45,6 +51,7 @@ class LoginView(GenericAPIView):
     user = None
     access_token = None
     token = None
+    ephemeral_token = None
 
     @sensitive_post_parameters_m
     def dispatch(self, *args, **kwargs):
@@ -52,6 +59,32 @@ class LoginView(GenericAPIView):
 
     def process_login(self):
         django_login(self.request, self.user)
+
+    def mfa_required(self):
+        """
+        Whether this login has to be completed with a second factor.
+
+        Lives on the base view on purpose: every alternative entry point
+        (social login, passkeys, anything else subclassing LoginView) has to
+        honour a user's enrolled second factor, and a check that each subclass
+        had to remember to add is a check that eventually gets forgotten.
+        """
+        if not mfa_app_installed():
+            return False
+        from .mfa.utils import is_mfa_enabled
+        return is_mfa_enabled(self.user)
+
+    def issue_tokens(self):
+        """Mint the auth token(s) for `self.user`. First factor is done by now."""
+        token_model = get_token_model()
+
+        if api_settings.USE_JWT:
+            self.access_token, self.refresh_token = jwt_encode(self.user)
+        elif token_model:
+            self.token = api_settings.TOKEN_CREATOR(token_model, self.user, self.serializer)
+
+        if api_settings.SESSION_LOGIN:
+            self.process_login()
 
     def get_response_serializer(self):
         if api_settings.USE_JWT:
@@ -67,17 +100,24 @@ class LoginView(GenericAPIView):
 
     def login(self):
         self.user = self.serializer.validated_data['user']
-        token_model = get_token_model()
 
-        if api_settings.USE_JWT:
-            self.access_token, self.refresh_token = jwt_encode(self.user)
-        elif token_model:
-            self.token = api_settings.TOKEN_CREATOR(token_model, self.user, self.serializer)
+        if self.mfa_required():
+            from .mfa.utils import create_ephemeral_token
+            self.ephemeral_token = create_ephemeral_token(self.user)
+            return
 
-        if api_settings.SESSION_LOGIN:
-            self.process_login()
+        self.issue_tokens()
+
+    def get_mfa_challenge_response(self):
+        return Response(
+            {'ephemeral_token': self.ephemeral_token, 'mfa_required': True},
+            status=status.HTTP_200_OK,
+        )
 
     def get_response(self):
+        if self.ephemeral_token:
+            return self.get_mfa_challenge_response()
+
         serializer_class = self.get_response_serializer()
 
         if api_settings.USE_JWT:

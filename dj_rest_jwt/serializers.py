@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.forms import SetPasswordForm, PasswordResetForm
@@ -13,6 +15,9 @@ if 'allauth' in settings.INSTALLED_APPS:
     from .forms import AllAuthPasswordResetForm
 
 from .models import TokenModel
+from .revocation import revoke_user_tokens
+
+logger = logging.getLogger('dj_rest_jwt')
 
 # Get the UserModel
 UserModel = get_user_model()
@@ -85,10 +90,22 @@ class LoginSerializer(serializers.Serializer):
                 username = UserModel.objects.get(email__iexact=email).get_username()
             except UserModel.DoesNotExist:
                 pass
+            except UserModel.MultipleObjectsReturned:
+                # Django's default User doesn't enforce a unique email, so this
+                # is reachable in practice. There's no way to tell which account
+                # was meant, and guessing would be an authentication bug - treat
+                # it as a failed login rather than raising a 500.
+                logger.warning(
+                    'Refusing login by email: the address is shared by more than one user.',
+                )
+                username = None
 
         if username:
             return self._validate_username_email(username, '', password)
 
+        # No account matched. Burn a password hash anyway so the response time
+        # doesn't reveal whether the address is registered.
+        UserModel().set_password(password)
         return None
 
     def get_auth_user(self, username, email, password):
@@ -160,16 +177,23 @@ class UserDetailsSerializer(serializers.ModelSerializer):
     User model w/o password
     """
 
-    @staticmethod
-    def validate_username(username):
+    def validate_username(self, username):
         if 'allauth.account' not in settings.INSTALLED_APPS:
             # We don't need to call the all-auth
             # username validator unless its installed
             return username
 
         from allauth.account.adapter import get_adapter
-        username = get_adapter().clean_username(username)
-        return username
+
+        # allauth's uniqueness check has no notion of "the user currently being
+        # edited", so a user PUT-ing their own unchanged username back would be
+        # told the name is taken - by themselves. `shallow=True` keeps the
+        # format and blacklist validation and drops only the DB lookup.
+        unchanged = (
+            self.instance is not None and  # noqa: W504
+            username == self.instance.get_username()
+        )
+        return get_adapter().clean_username(username, shallow=unchanged)
 
     class Meta:
         extra_fields = []
@@ -274,7 +298,6 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
     set_password_form_class = SetPasswordForm
 
-    _errors = {}
     user = None
     set_password_form = None
 
@@ -310,7 +333,12 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         return attrs
 
     def save(self):
-        return self.set_password_form.save()
+        user = self.set_password_form.save()
+        if api_settings.REVOKE_TOKENS_ON_PASSWORD_CHANGE:
+            # A reset is the canonical account-recovery move, so every session
+            # that existed before it - including the attacker's - has to die.
+            revoke_user_tokens(self.user)
+        return user
 
 
 class PasswordChangeSerializer(serializers.Serializer):
@@ -360,6 +388,15 @@ class PasswordChangeSerializer(serializers.Serializer):
 
     def save(self):
         self.set_password_form.save()
+
+        if api_settings.REVOKE_TOKENS_ON_PASSWORD_CHANGE:
+            # Every refresh token issued before the change goes, including the
+            # caller's: there is no reliable way to tell the caller's own
+            # refresh token apart from an attacker's, and the point of changing
+            # a password is to evict whoever else is holding one. Clients get a
+            # fresh pair by logging in again.
+            revoke_user_tokens(self.user)
+
         if not self.logout_on_password_change:
             from django.contrib.auth import update_session_auth_hash
             update_session_auth_hash(self.request, self.user)

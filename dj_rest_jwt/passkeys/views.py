@@ -1,11 +1,17 @@
 import json
 
 from rest_framework import status
-from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.generics import (
+    GenericAPIView, ListAPIView, RetrieveUpdateDestroyAPIView,
+)
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from dj_rest_jwt.app_settings import api_settings
+from dj_rest_jwt.throttling import (
+    CredentialActionRateThrottle, PasskeyChallengeRateThrottle,
+    SensitiveAccountActionRateThrottle,
+)
 from dj_rest_jwt.views import LoginView
 
 from .models import WebAuthnCredential
@@ -13,7 +19,7 @@ from .models import WebAuthnCredential
 
 class PasskeyRegisterBeginView(GenericAPIView):
     permission_classes = (IsAuthenticated,)
-    throttle_scope = 'dj_rest_jwt'
+    throttle_classes = (CredentialActionRateThrottle,)
 
     def get_serializer_class(self):
         return api_settings.PASSKEY_REGISTER_BEGIN_SERIALIZER
@@ -27,7 +33,7 @@ class PasskeyRegisterBeginView(GenericAPIView):
 
 class PasskeyRegisterCompleteView(GenericAPIView):
     permission_classes = (IsAuthenticated,)
-    throttle_scope = 'dj_rest_jwt'
+    throttle_classes = (CredentialActionRateThrottle,)
 
     def get_serializer_class(self):
         return api_settings.PASSKEY_REGISTER_COMPLETE_SERIALIZER
@@ -42,7 +48,7 @@ class PasskeyRegisterCompleteView(GenericAPIView):
 
 class PasskeyLoginBeginView(GenericAPIView):
     permission_classes = (AllowAny,)
-    throttle_scope = 'dj_rest_jwt'
+    throttle_classes = (PasskeyChallengeRateThrottle,)
 
     def get_serializer_class(self):
         return api_settings.PASSKEY_LOGIN_BEGIN_SERIALIZER
@@ -62,6 +68,19 @@ class PasskeyLoginCompleteView(LoginView):
     def get_serializer_class(self):
         return api_settings.PASSKEY_LOGIN_COMPLETE_SERIALIZER
 
+    def mfa_required(self):
+        """
+        A passkey is possession + (usually) user verification, so for many
+        deployments it already is multi-factor and challenging again is just
+        friction. That's a policy call rather than a security one, so it's a
+        setting - and it defaults to still challenging, because silently
+        skipping a second factor the user deliberately enrolled is the more
+        surprising of the two behaviours.
+        """
+        if api_settings.PASSKEY_SATISFIES_MFA:
+            return False
+        return super().mfa_required()
+
     def post(self, request, *args, **kwargs):
         self.request = request
         self.serializer = self.get_serializer(data=self.request.data)
@@ -72,7 +91,7 @@ class PasskeyLoginCompleteView(LoginView):
 
 class PasskeyListView(ListAPIView):
     permission_classes = (IsAuthenticated,)
-    throttle_scope = 'dj_rest_jwt'
+    throttle_classes = (SensitiveAccountActionRateThrottle,)
 
     def get_serializer_class(self):
         return api_settings.PASSKEY_LIST_SERIALIZER
@@ -83,7 +102,7 @@ class PasskeyListView(ListAPIView):
 
 class PasskeyDetailView(RetrieveUpdateDestroyAPIView):
     permission_classes = (IsAuthenticated,)
-    throttle_scope = 'dj_rest_jwt'
+    throttle_classes = (CredentialActionRateThrottle,)
 
     def get_queryset(self):
         return WebAuthnCredential.objects.filter(user=self.request.user)
@@ -91,4 +110,19 @@ class PasskeyDetailView(RetrieveUpdateDestroyAPIView):
     def get_serializer_class(self):
         if self.request.method == 'GET':
             return api_settings.PASSKEY_LIST_SERIALIZER
+        if self.request.method == 'DELETE':
+            return api_settings.PASSKEY_DELETE_SERIALIZER
         return api_settings.PASSKEY_UPDATE_SERIALIZER
+
+    def destroy(self, request, *args, **kwargs):
+        # Removing someone's passkey locks them out, so it gets the same
+        # step-up check as adding one. DELETE with a body is unusual but is the
+        # only way to carry the proof without inventing a second endpoint.
+        #
+        # Resolve the object first: a passkey belonging to someone else should
+        # answer 404 whether or not the caller sent valid credentials.
+        instance = self.get_object()
+        serializer = self.get_serializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)

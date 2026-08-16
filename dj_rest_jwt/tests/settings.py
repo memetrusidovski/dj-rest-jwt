@@ -88,6 +88,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',
     'allauth.socialaccount.providers.github',
     'allauth.socialaccount.providers.microsoft',
+    'allauth.socialaccount.providers.apple',
 
     'rest_framework',
     'rest_framework.authtoken',
@@ -95,6 +96,11 @@ INSTALLED_APPS = [
     'dj_rest_jwt',
     'dj_rest_jwt.registration',
     'dj_rest_jwt.passkeys',
+    # Installed so the suite exercises the app exactly as a project would: with
+    # its own app label and its migration actually applied. Leaving it out meant
+    # Authenticator was quietly adopted by the `dj_rest_jwt` app and created by
+    # run-syncdb, so the migration was never run in CI.
+    'dj_rest_jwt.mfa',
 
     'rest_framework_simplejwt.token_blacklist',
 ]

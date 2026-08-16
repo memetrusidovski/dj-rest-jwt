@@ -1,6 +1,6 @@
 # Social Authentication
 
-Integrate OAuth providers like Google, GitHub, and Facebook using django-allauth.
+Integrate OAuth providers like Google, GitHub, Microsoft, Apple and Facebook using django-allauth.
 
 !!! note "Maintainer's Note"
     dj-rest-jwt has optional and narrow support for django-allauth social authentication. The focus is on providing a clean API wrapper for the most common use cases.
@@ -319,6 +319,145 @@ urlpatterns = [
     path('api/auth/facebook/', FacebookLogin.as_view(), name='facebook_login'),
 ]
 ```
+
+---
+
+## Access token verification
+
+A client-supplied `access_token` proves someone holds *a* valid provider token.
+It does not prove the token was issued to **your** OAuth application. Without a
+check, an attacker holding a token minted for any other client - their own app,
+a compromised third party - can post it to your login endpoint and be signed in
+as its owner. This is usually called token substitution.
+
+dj-rest-jwt closes that by asking the provider who the token belongs to before
+trusting it. This is on by default:
+
+```python title="settings.py"
+REST_AUTH = {
+    'SOCIAL_LOGIN_VERIFY_ACCESS_TOKEN': True,   # default
+}
+```
+
+What each flow does:
+
+| What the client sends | What happens |
+|---|---|
+| `code` | Redeemed server-side with your client secret, so it is inherently bound to your app. No extra check needed. |
+| `id_token` | Signed by the provider and carries an `aud` claim that allauth verifies against your client id. No extra check needed. |
+| `access_token` alone | Checked against a provider verifier (below). Rejected if the provider has no verifier. |
+
+Verifiers ship for:
+
+| Provider | How it's checked |
+|---|---|
+| Google | `oauth2.googleapis.com/tokeninfo`, comparing `aud`/`azp` to your client id |
+| GitHub | `POST /applications/{client_id}/token` introspection, authenticated as your app |
+| Facebook | Graph `debug_token`, comparing the reported `app_id` to your client id |
+| Microsoft | None - Graph access tokens carry no audience you can check. Use the `code` flow. |
+| Apple | None needed - Apple authenticates through a signed, audience-checked `id_token`. |
+
+If the provider can't be reached, the login is refused rather than allowed
+through: a network blip must not become a free pass.
+
+### Adding your own verifier
+
+A verifier takes `(app, access_token)` and returns `True` when the token belongs
+to `app`. Raise `AccessTokenVerificationUnavailable` if you can't reach the
+provider to find out.
+
+```python title="settings.py"
+REST_AUTH = {
+    'SOCIAL_LOGIN_ACCESS_TOKEN_VERIFIERS': {
+        # keep the built-ins you still want...
+        'google': 'dj_rest_jwt.social_verification.verify_google_access_token',
+        # ...and add your own
+        'gitlab': 'myapp.social.verify_gitlab_access_token',
+    },
+}
+```
+
+!!! danger "Turning verification off"
+    `SOCIAL_LOGIN_VERIFY_ACCESS_TOKEN = False` restores the old, unchecked
+    behaviour. Only do this if every client that reaches these endpoints is one
+    you control end to end, and prefer the `code` flow instead.
+
+---
+
+## Apple (Sign in with Apple)
+
+Apple is a little different from the other providers: the client secret is a
+short-lived ES256 JWT rather than a static string, so the ready-made view uses
+`AppleOAuth2Client`.
+
+### 1. Configure your Apple developer account
+
+1. Create an **App ID** and enable *Sign In with Apple*.
+2. Create a **Services ID** - this is your `client_id`.
+3. Create a **Key** with *Sign In with Apple* enabled and download the
+   `AuthKey_XXXXXXXXXX.p8` file. You cannot download it twice.
+4. Note your **Team ID** and the key's **Key ID**.
+
+### 2. Add the Social Application
+
+In the Django admin, create a `SocialApp` with provider `apple` and:
+
+| Field | Value |
+|---|---|
+| Client id | your Services ID (comma-separate several, e.g. web + native bundle id) |
+| Secret key | the **Key ID** of your `.p8` key |
+| Key | your **Team ID** |
+| Settings | `{"certificate_key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"}` |
+
+Add `allauth.socialaccount.providers.apple` to `INSTALLED_APPS`.
+
+### 3. Use the built-in view
+
+`dj_rest_jwt.registration.urls` already registers it:
+
+```
+POST /dj-rest-jwt/registration/apple/login/
+POST /dj-rest-jwt/registration/apple/connect/
+```
+
+Or mount it yourself:
+
+```python title="urls.py"
+from dj_rest_jwt.registration.social_views import AppleLogin
+
+urlpatterns = [
+    path('api/auth/apple/', AppleLogin.as_view(), name='apple_login'),
+]
+```
+
+### 4. Frontend flow
+
+Native iOS clients already hold Apple's response, so post both tokens:
+
+```js
+await fetch('/dj-rest-jwt/registration/apple/login/', {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify({
+    access_token: appleResponse.authorization.access_token,
+    id_token: appleResponse.authorization.id_token,
+  }),
+});
+```
+
+Web clients doing the redirect dance post the authorization code instead:
+
+```js
+await fetch('/dj-rest-jwt/registration/apple/login/', {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify({code: appleResponse.authorization.code}),
+});
+```
+
+!!! note "Apple only sends the user's name once"
+    Apple includes the user's real name only on the very first authorization.
+    Persist it then, or you will never see it again.
 
 ---
 
