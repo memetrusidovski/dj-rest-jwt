@@ -1,9 +1,7 @@
 name: Security Checks
 on:
   pull_request:
-    branches:
-      - master
-      - main
+    branches: [main]
 
 permissions:
   contents: read
@@ -14,19 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     name: Bandit SAST
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install Bandit
-        run: pip install bandit[toml]
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
       - name: Run Bandit
-        run: bandit -r dj_rest_jwt/ --exclude dj_rest_jwt/tests -s B105 -f json -o bandit-results.json
+        run: uvx --from 'bandit[toml]' bandit -r dj_rest_jwt/ --exclude dj_rest_jwt/tests -s B105 -f json -o bandit-results.json
       - name: Display results
         if: always()
-        run: bandit -r dj_rest_jwt/ --exclude dj_rest_jwt/tests -s B105 -f screen
+        run: uvx --from 'bandit[toml]' bandit -r dj_rest_jwt/ --exclude dj_rest_jwt/tests -s B105 -f screen
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
@@ -54,18 +46,12 @@ jobs:
     runs-on: ubuntu-latest
     name: pip-audit Dependency Scan
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install dependencies
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+      - name: Run pip-audit on the locked dependencies
         run: |
-          pip install pip-audit
-          pip install -r dj_rest_jwt/tests/requirements.txt
-      - name: Run pip-audit
-        run: pip-audit --strict --desc
+          uv export --frozen --all-groups --no-emit-project --no-hashes -o requirements-audit.txt
+          uvx pip-audit -r requirements-audit.txt --strict --desc
 
   semgrep:
     runs-on: ubuntu-latest

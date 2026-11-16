@@ -9,8 +9,18 @@ from django.core import mail
 from django.test import TestCase
 
 from .helpers import (
-    AUTH, ORIGIN, PASSWORD, Api, VerifyingDevice, decode_options, encode_credential,
-    google_identity, google_login, make_user, pending_flows, totp_code,
+    AUTH,
+    ORIGIN,
+    PASSWORD,
+    Api,
+    VerifyingDevice,
+    decode_options,
+    encode_credential,
+    google_identity,
+    google_login,
+    make_user,
+    pending_flows,
+    totp_code,
 )
 
 GOOGLE_VERIFY = "allauth.socialaccount.providers.google.views._verify_and_decode"

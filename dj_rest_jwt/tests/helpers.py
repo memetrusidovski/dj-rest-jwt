@@ -1,5 +1,6 @@
 import base64
 import json
+import os
 import struct
 
 from allauth.account.models import EmailAddress
@@ -9,8 +10,8 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from django.contrib.auth import get_user_model
 from django.test import Client
 from fido2 import cbor
+from fido2.cose import ES256
 from fido2.utils import sha256
-from soft_webauthn import SoftWebauthnDevice
 
 AUTH = "/api/auth/v1"
 PASSWORD = "Correct-Horse-9-Battery"
@@ -105,28 +106,51 @@ class Api:
         return self.call("post", f"{AUTH}/tokens/refresh", {})
 
 
-class VerifyingDevice(SoftWebauthnDevice):
-    """soft-webauthn, but reporting user verification (biometric/PIN) like a real passkey."""
+class VerifyingDevice:
+    """
+    A software passkey: one ES256 credential, "none" attestation, and user
+    verification reported (UV flag) like a real biometric/PIN passkey.
+    Takes options with bytes challenge/user id (see decode_options) and
+    returns credentials with bytes fields (see encode_credential).
+    """
+
+    def __init__(self):
+        self.credential_id = os.urandom(32)
+        self.private_key = ec.generate_private_key(ec.SECP256R1())
+        self.rp_id = None
+        self.user_handle = None
+        self.sign_count = 0
+
+    @staticmethod
+    def _client_data(kind, options, origin):
+        return json.dumps({
+            "type": kind, "challenge": b64url(options["publicKey"]["challenge"]), "origin": origin,
+        }).encode()
 
     def create(self, options, origin):
-        cred = super().create(options, origin)
-        att = cbor.decode(cred["response"]["attestationObject"])
-        auth_data = bytearray(att["authData"])
-        auth_data[32] |= 0x04                       # UV flag; 'none' attestation is unsigned
-        att["authData"] = bytes(auth_data)
-        cred["response"]["attestationObject"] = cbor.encode(att)
-        return cred
+        pk = options["publicKey"]
+        if {"alg": -7, "type": "public-key"} not in pk["pubKeyCredParams"]:
+            raise ValueError("ES256 not offered")
+        self.rp_id, self.user_handle = pk["rp"]["id"], pk["user"]["id"]
+        cose_key = cbor.encode(ES256.from_cryptography_key(self.private_key.public_key()))
+        auth_data = (
+            sha256(self.rp_id.encode()) + b"\x45" + struct.pack(">I", self.sign_count)   # UP | UV | AT
+            + b"\x00" * 16 + struct.pack(">H", len(self.credential_id)) + self.credential_id + cose_key
+        )
+        return {
+            "rawId": self.credential_id,
+            "response": {
+                "clientDataJSON": self._client_data("webauthn.create", options, origin),
+                "attestationObject": cbor.encode({"fmt": "none", "attStmt": {}, "authData": auth_data}),
+            },
+        }
 
     def get(self, options, origin):
         if self.rp_id != options["publicKey"]["rpId"]:
             raise ValueError("rpId mismatch")
         self.sign_count += 1
-        client_data = json.dumps({
-            "type": "webauthn.get",
-            "challenge": b64url(options["publicKey"]["challenge"]),
-            "origin": origin,
-        }).encode()
-        auth_data = sha256(self.rp_id.encode()) + b"\x05" + struct.pack(">I", self.sign_count)
+        client_data = self._client_data("webauthn.get", options, origin)
+        auth_data = sha256(self.rp_id.encode()) + b"\x05" + struct.pack(">I", self.sign_count)   # UP | UV
         signature = self.private_key.sign(auth_data + sha256(client_data), ec.ECDSA(hashes.SHA256()))
         return {
             "rawId": self.credential_id,
@@ -138,7 +162,7 @@ class VerifyingDevice(SoftWebauthnDevice):
 
 
 def decode_options(options):
-    """allauth's JSON WebAuthn options -> the bytes soft-webauthn expects."""
+    """allauth's JSON WebAuthn options -> the bytes VerifyingDevice expects."""
     pk = dict(options["publicKey"] if "publicKey" in options else options)
     pk["challenge"] = b64url_decode(pk["challenge"])
     if "user" in pk:

@@ -15,13 +15,14 @@ allauth's non-public `headless.tokens.strategies.jwt.internal`).
 ## Common Commands
 
 ```bash
-python runtests.py                                        # all tests
-python runtests.py dj_rest_jwt.tests.test_tokens          # one module
-python runtests.py dj_rest_jwt.tests.test_tokens.SessionTests.test_pending_login_token_is_dead_once_login_completes
-coverage run ./runtests.py && coverage report
-flake8 dj_rest_jwt/
-tox                                                       # py3.12–3.14 × Django 6.0/6.1
-pip install -e . -r dj_rest_jwt/tests/requirements.txt    # dev setup
+uv sync                                                   # dev setup (Python 3.13 venv + test/lint tools)
+uv run python runtests.py                                 # all tests
+uv run python runtests.py dj_rest_jwt.tests.test_tokens   # one module
+uv run python runtests.py dj_rest_jwt.tests.test_tokens.SessionTests.test_pending_login_token_is_dead_once_login_completes
+uv run coverage run runtests.py && uv run coverage report
+uv run ruff check dj_rest_jwt runtests.py
+uv run --python 3.12 --with "django~=6.0.0" python runtests.py   # one CI matrix cell
+uv build                                                  # sdist + wheel (hatchling)
 ```
 
 ## Architecture (`dj_rest_jwt/`)
@@ -88,4 +89,5 @@ pip install -e . -r dj_rest_jwt/tests/requirements.txt    # dev setup
 
 ## Code Style
 
-flake8, max line length 120 (`setup.cfg`).
+ruff (`pyproject.toml`): line length 120, rules E/F/W/I/B/UP. Packaging is `pyproject.toml` + hatchling;
+dev tools are dependency groups (`test`, `lint`, `docs`), locked in `uv.lock`.

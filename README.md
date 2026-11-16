@@ -152,9 +152,9 @@ Add a `<name>_message.html` next to any `<name>_message.txt` to send HTML too.
 ## Development
 
 ```bash
-pip install -e . -r dj_rest_jwt/tests/requirements.txt
-python runtests.py
-flake8 dj_rest_jwt/
+uv sync                          # Python 3.13 venv with the test and lint tools
+uv run python runtests.py
+uv run ruff check dj_rest_jwt
 cd js && npm install && npm test
 ```
 

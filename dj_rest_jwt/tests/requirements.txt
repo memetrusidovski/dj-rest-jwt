@@ -1,5 +1,0 @@
-coverage
-fido2>=1.1
-soft-webauthn
-time-machine
-unittest-xml-reporting

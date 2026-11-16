@@ -15,11 +15,11 @@ Sign in with Google.
 ## Run it
 
 ```bash
-# backend (Python 3.12+)
+# backend, from the repo root (needs uv: https://docs.astral.sh/uv/)
+uv sync
 cd demo/backend
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserver          # http://localhost:8000
+uv run python manage.py migrate
+uv run python manage.py runserver   # http://localhost:8000
 
 # SPA, in another terminal (Node 20.19+)
 cd js && npm install && cd ../demo/spa
@@ -31,9 +31,9 @@ Or `docker compose up` in this directory.
 
 Open http://localhost:5173. Emails (verification and reset codes) print in the
 backend's terminal. The admin is at http://localhost:5173/admin/ after
-`python manage.py createsuperuser`.
+`uv run python manage.py createsuperuser`.
 
-Optional: `GOOGLE_CLIENT_ID=... python manage.py runserver` shows "Sign in with
+Optional: `GOOGLE_CLIENT_ID=... uv run python manage.py runserver` shows "Sign in with
 Google" (add `http://localhost:5173` as an authorized JavaScript origin).
 
 ## Things to try
@@ -42,7 +42,7 @@ Google" (add `http://localhost:5173` as an authorized JavaScript origin).
   `verification="link", password_reset="link"`. Emails then link to the SPA's
   `/verify-email/:key` and `/reset-password/:key` routes.
 - **Edit an email.** Change `backend/templates/account/email/base_message.html`
-  and sign up again. `python manage.py copy_email_templates templates/` copies
+  and sign up again. `uv run python manage.py copy_email_templates templates/` copies
   every allauth email for editing.
 - **Stay signed in.** Access tokens last 5 minutes. Leave the tab, come back
   later, click "GET /api/me": the client refreshes on its own.

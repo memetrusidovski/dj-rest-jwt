@@ -9,8 +9,10 @@ class DjRestJwtConfig(AppConfig):
     def ready(self):
         from django.apps import apps
 
-        from . import checks  # noqa: F401  (registers the system checks)
-        from . import conf
+        from . import (
+            checks,  # noqa: F401  (registers the system checks)
+            conf,
+        )
 
         if conf.get("ADMIN_LOGIN") and apps.is_installed("django.contrib.admin"):
             from .admin_login import secure_admin_site

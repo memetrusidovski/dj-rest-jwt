@@ -78,7 +78,7 @@ target/
 .idea
 
 # pyenv
-.python-version
+# .python-version is committed: it pins the development Python for uv
 
 # celery beat schedule file
 celerybeat-schedule

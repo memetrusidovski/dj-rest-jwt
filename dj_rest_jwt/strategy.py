@@ -11,7 +11,7 @@ allauth's JWT token strategy, extended with:
 Set ``HEADLESS_TOKEN_STRATEGY = "dj_rest_jwt.strategy.JWTTokenStrategy"``.
 
 Note: this uses ``allauth.headless.tokens.strategies.jwt.internal``, which is
-not public API. The supported allauth range is pinned in setup.py and the test
+not public API. The supported allauth range is pinned in pyproject.toml and the test
 suite exercises every function used here.
 """
 import logging

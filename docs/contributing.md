@@ -5,18 +5,21 @@
 ```bash
 git clone https://github.com/memetrusidovski/dj-rest-jwt.git
 cd dj-rest-jwt
-python -m venv .venv && source .venv/bin/activate     # Python 3.12+
-pip install -e . -r dj_rest_jwt/tests/requirements.txt
+uv sync          # creates .venv (Python 3.13) with the package and the test + lint tools
 ```
+
+[uv](https://docs.astral.sh/uv/) manages the Python version, the virtualenv and the locked dev
+tools (`uv.lock`). Users of the package are unaffected; they install it with pip or anything
+else.
 
 ## Python tests
 
 ```bash
-python runtests.py                                  # all
-python runtests.py dj_rest_jwt.tests.test_tokens    # one module
-coverage run ./runtests.py && coverage report
-flake8 dj_rest_jwt/
-tox                                                 # Python 3.12–3.14 × Django 6.0/6.1
+uv run python runtests.py                                  # all
+uv run python runtests.py dj_rest_jwt.tests.test_tokens    # one module
+uv run coverage run runtests.py && uv run coverage report
+uv run ruff check dj_rest_jwt runtests.py
+uv run --python 3.12 --with "django~=6.0.0" python runtests.py   # another Python/Django combination
 ```
 
 Tests are end-to-end over HTTP. A change to a security-relevant code path needs a test that fails
@@ -34,16 +37,15 @@ End-to-end against the demo backend, both transports:
 
 ```bash
 mkdir -p /tmp/mails
-cd demo/backend && python manage.py migrate
-EMAIL_FILE_PATH=/tmp/mails python manage.py runserver 8765 &
+cd demo/backend && uv run python manage.py migrate
+EMAIL_FILE_PATH=/tmp/mails uv run python manage.py runserver 8765 &
 cd ../../js && E2E_URL=http://localhost:8765 E2E_MAILS=/tmp/mails npx vitest run test/e2e.test.ts
 ```
 
 ## Docs
 
 ```bash
-pip install -r docs/requirements.txt
-zensical serve                 # http://localhost:8000
+uv run --group docs zensical serve     # http://localhost:8000
 ```
 
 Pushes to `main` publish the site to GitHub Pages.

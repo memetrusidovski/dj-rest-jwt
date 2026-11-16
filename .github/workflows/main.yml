@@ -1,106 +1,64 @@
 name: Lint, Build and Test
 on:
   push:
-    branches:
-      - master
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - master
-      - main
+    branches: [main]
 
 jobs:
   lint:
     runs-on: ubuntu-latest
     name: Lint
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install flake8==7.1.1
-      - name: Lint
-        run: flake8 dj_rest_jwt/
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+      - run: uv run --only-group lint ruff check dj_rest_jwt runtests.py
+
   build:
     runs-on: ubuntu-latest
     name: Build
-    needs: [ lint ]
+    needs: [lint]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip build
-      - name: Build
-        run: python -m build
-      - name: Store artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+      - run: uv build
+      - uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
+
   test:
     runs-on: ubuntu-latest
-    name: Test Python ${{ matrix.python-version }} + Django ~= ${{ matrix.django-version }}
-    needs: [ build ]
+    name: Test Python ${{ matrix.python-version }} + Django ${{ matrix.django-version }}
+    needs: [build]
     strategy:
       matrix:
-        python-version: [ '3.12', '3.13', '3.14' ]
-        django-version: [ '6.0', '6.1' ]
+        python-version: ['3.12', '3.13', '3.14']
+        django-version: ['6.0', '6.1']
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
+      - name: Run tests
         run: |
-          pip install -r dj_rest_jwt/tests/requirements.txt
-          pip install "Django~=${{ matrix.django-version }}.0"
-          pip install -e .
-      - name: Run Tests
-        run: |
-          echo "$(python --version) / Django $(django-admin --version)"
-          coverage run ./runtests.py
-      - name: Generate Coverage Report
-        run: |
-          mkdir -p test-results/
-          coverage report
-          coverage xml
-      - name: Code Coverage Summary Report
-        uses: irongut/CodeCoverageSummary@v1.3.0
-        with:
-          filename: coverage.xml
-      - name: Store test results
-        uses: actions/upload-artifact@v4
-        with:
-          name: results-${{ matrix.python-version }}-${{ matrix.django-version }}
-          path: test-results/
+          uv run --with "django~=${{ matrix.django-version }}.0" python -c "import sys, django; print(sys.version, django.get_version())"
+          uv run --with "django~=${{ matrix.django-version }}.0" coverage run runtests.py
+          uv run coverage report
+
   js:
     runs-on: ubuntu-latest
     name: JS client (unit + end-to-end against the demo backend)
-    needs: [ lint ]
+    needs: [lint]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Install
         run: |
-          pip install -e .
+          uv sync
           cd js && npm install
       - name: Typecheck and unit tests
         working-directory: js
@@ -109,8 +67,8 @@ jobs:
         run: |
           mkdir -p /tmp/mails
           cd demo/backend
-          python manage.py migrate -v0
-          EMAIL_FILE_PATH=/tmp/mails python manage.py runserver 8765 --noreload &
+          uv run python manage.py migrate -v0
+          EMAIL_FILE_PATH=/tmp/mails uv run python manage.py runserver 8765 --noreload &
           for i in $(seq 1 30); do curl -sf -o /dev/null localhost:8765/api/auth/v1/config && break; sleep 1; done
           cd ../../js
           E2E_URL=http://localhost:8765 E2E_MAILS=/tmp/mails npx vitest run test/e2e.test.ts
