@@ -1,189 +1,39 @@
 # Security
 
-## Vulnerability Disclosure Policy
+## Reporting a vulnerability
 
-Please observe standard best practices of responsible disclosure when reporting security vulnerabilities.
+Please don't open a public issue. Report privately through GitHub's
+[security advisory form](https://github.com/memetrusidovski/dj-rest-jwt/security/advisories/new)
+with a description, steps to reproduce and the impact. Only test against your own
+installations.
 
-See OWASP's [Vulnerability Disclosure Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Vulnerability_Disclosure_Cheat_Sheet.html) for guidance.
+Vulnerabilities in authentication logic itself (login, MFA, social providers) usually belong to
+[django-allauth](https://github.com/pennersr/django-allauth/security); if you're unsure, report
+here and we'll forward it.
 
-### Reporting a Vulnerability
+## What is protected, and how
 
-1. **Do not** open a public GitHub issue for security vulnerabilities
-2. **Report privately** through GitHub's [security advisory form](https://github.com/memetrusidovski/dj-rest-jwt/security/advisories/new)
-3. Include:
-   - Description of the vulnerability
-   - Steps to reproduce
-   - Potential impact
-   - Suggested fix (if any)
+| Threat | Protection |
+|---|---|
+| XSS stealing tokens | Browser tokens live in httpOnly cookies only; never in a response body |
+| CSRF with cookie auth | Django's CSRF check on every cookie-authenticated unsafe request, including refresh |
+| Stolen refresh token | Rotation on every use; reuse ends the session for everyone holding it |
+| Lost device, logout, password change | Server-side session per login, checked on every request: revocation is immediate |
+| Credential stuffing, brute force | allauth's rate limits per IP and per account; Argon2 hashing |
+| Account enumeration | `ACCOUNT_PREVENT_ENUMERATION`: signup and reset answer the same for known and unknown addresses |
+| Social-login account takeover | No sign-in by matching email address |
+| Session token leakage | allauth's `session_token` stripped from responses once sign-in completes |
+| Header/cookie confusion | Header-transport requests never read or set cookies |
+| Admin brute force | Admin sign-in through allauth: rate limits and MFA |
+| Weak configuration | System checks; deploy checks for `Secure` cookies and shared caches |
+| Signup spam | Honeypot; optional Turnstile/reCAPTCHA/hCaptcha, failing closed |
 
-### What to Expect
+## Production checklist
 
-- Acknowledgment within 48 hours
-- Regular updates on progress
-- Credit in the security advisory (unless you prefer anonymity)
-
-### Guidelines
-
-- **Keep it legal** - Only test against your own installations
-- **Respect privacy** - Don't access or modify other users' data
-- **Be patient** - Security fixes take time to develop and test properly
-
----
-
-## Security Best Practices
-
-### JWT Configuration
-
-```python title="settings.py (Production)"
-REST_AUTH = {
-    'USE_JWT': True,
-    'JWT_AUTH_COOKIE': 'access',
-    'JWT_AUTH_REFRESH_COOKIE': 'refresh',
-    'JWT_AUTH_HTTPONLY': True,       # Prevent XSS
-    'JWT_AUTH_SECURE': True,          # HTTPS only
-    'JWT_AUTH_SAMESITE': 'Lax',       # CSRF protection
-}
-
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),   # Short-lived
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
-}
-```
-
-### Rate Limiting
-
-Every auth endpoint is rate limited from the first request - there is nothing to
-turn on. Tune the limits in `REST_AUTH`, not in DRF's `DEFAULT_THROTTLE_RATES`:
-
-```python title="settings.py"
-REST_AUTH = {
-    'RATE_LIMIT_LOGIN': '10/min',
-    'RATE_LIMIT_REGISTER': '20/hour',
-    'RATE_LIMIT_PASSWORD_RESET': '5/hour',
-    'RATE_LIMIT_SENSITIVE_ACTION': '30/hour',
-    'RATE_LIMIT_MFA_VERIFY': '5/min',
-    'RATE_LIMIT_CREDENTIAL_ACTION': '20/hour',
-    'RATE_LIMIT_PASSKEY_CHALLENGE': '20/min',
-}
-```
-
-Throttle state lives in Django's cache, so use a shared backend (Redis,
-Memcached) if you run more than one process - the default per-process
-`LocMemCache` multiplies every limit by your worker count.
-
-### Token revocation
-
-Changing or resetting a password blacklists the user's outstanding refresh
-tokens, so the "I think I've been compromised" flow actually evicts whoever else
-is holding one. This needs somewhere to record the revocation:
-
-```python title="settings.py"
-INSTALLED_APPS = [
-    # ...
-    'rest_framework_simplejwt.token_blacklist',
-]
-
-REST_AUTH = {
-    'REVOKE_TOKENS_ON_PASSWORD_CHANGE': True,  # default
-}
-```
-
-This also deletes the user's DRF `authtoken` key if you use one, since those
-never expire on their own. Clients get a fresh credential by logging in again.
-
-Access tokens already in flight can't be individually revoked and stay valid
-until they expire, which is the argument for a short `ACCESS_TOKEN_LIFETIME`.
-
-`manage.py check` warns if revocation is on without the blacklist app installed.
-
-### Step-up re-authentication
-
-Enrolling a passkey, removing one, or regenerating recovery codes creates or
-destroys a credential that outlives the access token used to do it. These
-endpoints require the caller to re-prove who they are with `password` or a
-current second-factor `code`. Note that a `code` used this way is consumed - a
-TOTP code burns its time step, and a recovery code is spent - so prefer the
-password where the account has one:
-
-```python title="settings.py"
-REST_AUTH = {
-    'REQUIRE_REAUTH_FOR_CREDENTIAL_CHANGES': True,  # default
-}
-```
-
-### Social login token substitution
-
-A raw provider `access_token` doesn't prove which OAuth application it was
-issued to. dj-rest-jwt verifies that with the provider before trusting it - see
-[Access token verification](guides/social-auth.md#access-token-verification).
-
-### Password Validation
-
-Use Django's password validators:
-
-```python title="settings.py"
-AUTH_PASSWORD_VALIDATORS = [
-    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-     'OPTIONS': {'min_length': 12}},
-    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
-]
-```
-
-### HTTPS
-
-Always use HTTPS in production:
-
-```python title="settings.py"
-SECURE_SSL_REDIRECT = True
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
-```
-
----
-
-## Known Security Considerations
-
-### Email Enumeration
-
-By design, the password reset endpoint always returns a success response, even
-for non-existent emails. The login endpoint runs the password hasher even when
-no account matches, so response timing doesn't reveal which addresses are
-registered either.
-
-Registration is the exception: it has to tell the caller that an email or
-username is already taken, so it necessarily confirms existence. If that matters
-for your threat model, override `RegisterSerializer` to accept the signup and
-send a "this address is already registered" email instead.
-
-### Token Storage
-
-- **DO**: Store tokens in HTTP-only cookies
-- **DON'T**: Store tokens in localStorage or sessionStorage (XSS vulnerable)
-
-### CORS
-
-Be restrictive with CORS origins in production:
-
-```python title="settings.py"
-CORS_ALLOWED_ORIGINS = [
-    'https://yourapp.com',  # Specific domains only
-]
-CORS_ALLOW_CREDENTIALS = True
-```
-
----
-
-## Security Updates
-
-Security updates are released as patch versions. Always keep dj-rest-jwt updated:
-
-```bash
-pip install --upgrade dj-rest-jwt
-```
-
-Subscribe to [GitHub releases](https://github.com/iMerica/dj-rest-jwt/releases) for security announcements.
+- [ ] `python manage.py check --deploy` is clean
+- [ ] `HEADLESS_JWT_PRIVATE_KEY` comes from a secret store, not the repository
+- [ ] HTTPS everywhere, `SECURE_HSTS_SECONDS` set, `DEBUG = False`
+- [ ] `CACHES["default"]` is Redis or Memcached, shared by all processes
+- [ ] Email delivery configured, and the frontend handles the pages in `HEADLESS_FRONTEND_URLS`
+- [ ] Rotating the JWT key signs everyone out; plan for it
+- [ ] A receiver on `dj_rest_jwt.signals.refresh_token_reused` alerts the user or your team

@@ -1,153 +1,50 @@
 # dj-rest-jwt
 
-<p style="font-size: 1.4em; color: var(--md-default-fg-color--light);">
-Drop-in authentication endpoints for Django REST Framework. Works seamlessly with SPAs and mobile apps.
-</p>
+Secure, API-first JWT authentication for Django, built on
+[django-allauth](https://docs.allauth.org/) headless.
 
-[![CI](https://github.com/iMerica/dj-rest-jwt/actions/workflows/main.yml/badge.svg)](https://github.com/iMerica/dj-rest-jwt/actions/workflows/main.yml)
-[![PyPI](https://img.shields.io/pypi/v/dj-rest-jwt)](https://pypi.org/project/dj-rest-jwt/)
-[![Python](https://img.shields.io/badge/python-3.10--3.14-blue)](https://pypi.org/project/dj-rest-jwt/)
-[![Django](https://img.shields.io/badge/django-4.2--6.0-green)](https://pypi.org/project/dj-rest-jwt/)
-
----
-
-## Why dj-rest-jwt?
-
-Building authentication for your API shouldn't require reinventing the wheel. **dj-rest-jwt** provides a complete set of REST API endpoints for user authentication, registration, and account management—all following security best practices.
+allauth does the authentication itself: login, signup, email verification, password reset, TOTP
+and recovery codes, passkeys, 100+ social providers, device sessions, and JWT minting with
+refresh-token rotation. dj-rest-jwt adds the layer an API-first project still needs, with every
+protection switched on:
 
 <div class="grid cards" markdown>
 
--   :material-lightning-bolt:{ .lg .middle } **Quick Setup**
-
-    ---
-
-    Install with pip and add a few lines to your Django settings. Get authentication working in minutes.
-
-    [:octicons-arrow-right-24: Getting started](getting-started/installation.md)
-
--   :material-shield-lock:{ .lg .middle } **Secure by Default**
-
-    ---
-
-    HTTP-only, Secure JWT cookies; rate limits on every endpoint from the first request; MFA and passkeys; token revocation on password change.
-
-    [:octicons-arrow-right-24: Security options](guides/jwt-cookies.md)
-
--   :material-puzzle:{ .lg .middle } **Fully Customizable**
-
-    ---
-
-    Every serializer is overridable. Extend or replace any component to fit your needs.
-
-    [:octicons-arrow-right-24: Customization](configuration/customization.md)
-
--   :fontawesome-brands-google:{ .lg .middle } **Social Authentication**
-
-    ---
-
-    Integrate Google, GitHub, Facebook, and other OAuth providers via django-allauth.
-
-    [:octicons-arrow-right-24: Social auth](guides/social-auth.md)
-
--   :material-fingerprint:{ .lg .middle } **Passkeys (WebAuthn)**
-
-    ---
-
-    Passwordless login with Touch ID, Windows Hello, and hardware security keys via FIDO2/WebAuthn.
-
-    [:octicons-arrow-right-24: Passkeys guide](guides/passkeys.md)
+- **Cookies for browsers, headers for apps.** A React SPA gets httpOnly cookies that script can
+  never read. A native app sends `X-Auth-Transport: header` and uses `Authorization: Bearer`.
+  [More](guides/transports.md)
+- **Stays signed in.** Each refresh issues a new refresh token, so a user who comes back within
+  30 days never logs in again, like Google or Instagram. [More](guides/sessions.md)
+- **Theft detection and instant revocation.** Replaying an old refresh token ends the session;
+  logging out or revoking a device takes effect on the next request.
+- **A JavaScript client** that refreshes on 401, shares one refresh across tabs, and wraps every
+  flow including passkeys. [More](guides/js-client.md)
+- **Codes or links in emails**, one setting; every email editable. [More](guides/emails.md)
+- **A secure admin, signup anti-spam, a secure settings preset, and system checks** that flag
+  anything that weakens it.
 
 </div>
 
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| **Login / Logout** | Token and JWT-based authentication with session support |
-| **Registration** | User signup with email verification (via django-allauth) |
-| **Password Management** | Reset via email, change with old password verification |
-| **User Details** | Retrieve and update user profile information |
-| **JWT Cookies** | Secure HTTP-only cookie transport for SPAs |
-| **Social Auth** | OAuth2 login with Google, GitHub, Facebook, and more |
-| **Passkeys** | Passwordless login via FIDO2/WebAuthn (Touch ID, security keys) |
-| **Token Refresh** | Automatic JWT refresh with sliding sessions |
-
-## Requirements
-
-| Package | Version |
-|---------|---------|
-| Python | >= 3.10 |
-| Django | >= 4.2 |
-| Django REST Framework | >= 3.14 |
-
-## Quick Example
-
-```python title="settings.py"
-INSTALLED_APPS = [
-    # ...
-    'rest_framework',
-    'rest_framework.authtoken',
-    'dj_rest_jwt',
-]
-
-REST_AUTH = {
-    'USE_JWT': True,
-    'JWT_AUTH_COOKIE': 'auth',
-    'JWT_AUTH_HTTPONLY': True,
-}
-```
-
-```python title="urls.py"
-from django.urls import path, include
-
-urlpatterns = [
-    path('api/auth/', include('dj_rest_jwt.urls')),
-]
-```
-
-That's it! You now have these endpoints:
-
-- `POST /api/auth/login/` - Obtain token
-- `POST /api/auth/logout/` - Revoke token
-- `POST /api/auth/password/reset/` - Request password reset
-- `POST /api/auth/password/change/` - Change password
-- `GET /api/auth/user/` - Get current user
-
-[:octicons-arrow-right-24: See the full quickstart guide](getting-started/quickstart.md)
-
-## Architecture
+## How it fits together
 
 ```mermaid
 flowchart LR
-    subgraph client [Client App]
-        SPA[React / Vue / Mobile]
-    end
-    
-    subgraph djrestauth [dj-rest-jwt]
-        Login[LoginView]
-        Logout[LogoutView]
-        User[UserDetailsView]
-        PWReset[PasswordResetView]
-    end
-    
-    subgraph django [Django]
-        Auth[django.contrib.auth]
-        Allauth[django-allauth]
-        SimpleJWT[djangorestframework-simplejwt]
-    end
-    
-    SPA -->|POST /login/| Login
-    SPA -->|POST /logout/| Logout
-    SPA -->|GET /user/| User
-    SPA -->|POST /password/reset/| PWReset
-    
-    Login --> Auth
-    Login --> SimpleJWT
-    Logout --> Auth
-    User --> Auth
-    PWReset --> Allauth
+  SPA[React SPA] -- httpOnly cookies + CSRF --> T
+  App[Native app] -- Authorization: Bearer --> T
+  T[TokenTransportMiddleware] --> A[allauth headless<br/>/api/auth/v1/...]
+  SPA --> API[Your DRF API]
+  App --> API
+  API -- JWTAuthentication --> S[(Session store:<br/>revocation, rotation)]
+  A --> S
 ```
 
-## License
+Each JWT login is backed by a server-side session, which is what makes revocation instant and
+refresh-token reuse detectable. Sessions are never a client credential; the client only ever
+holds JWTs (or cookies containing them).
 
-MIT License - See [LICENSE](https://github.com/iMerica/dj-rest-jwt/blob/master/LICENSE) for details.
+## Requirements
+
+Python 3.12+, Django 6.0+, django-allauth 65.22+.
+
+[Get started](quickstart.md){ .md-button .md-button--primary }
+[Try the demo](https://github.com/memetrusidovski/dj-rest-jwt/tree/main/demo){ .md-button }

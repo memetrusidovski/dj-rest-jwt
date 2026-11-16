@@ -1,168 +1,125 @@
 """
-Django settings for demo project.
+Demo settings: dj-rest-jwt's secure preset plus what a local dev setup needs.
 
-For more information on this file, see
-https://docs.djangoproject.com/en/1.7/topics/settings/
-
-For the full list of settings and their values, see
-https://docs.djangoproject.com/en/1.7/ref/settings/
+Not a deployment template. Values marked DEV ONLY must change in production.
 """
-
-# Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
+from pathlib import Path
 
 from django.core.management.utils import get_random_secret_key
 
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+from dj_rest_jwt.defaults import *  # noqa: F401,F403  the secure preset
+from dj_rest_jwt.defaults import DJ_REST_JWT_APPS, DJ_REST_JWT_MIDDLEWARE, email_flows
 
-# The HTML pages live in demo/templates, one level above the Django project
-# (demo/backend), so that the SPA client and this server-rendered tour of the
-# API sit side by side under demo/.
-DEMO_DIR = os.path.dirname(BASE_DIR)
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-# This project exists to demo the package locally. It is not a deployment
-# template - see ../../starter for that - but it still shouldn't ship a
-# checked-in secret key or answer to every Host header.
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or get_random_secret_key()
+# DEV ONLY: generated once and kept on disk. It also protects sessions (and
+# so every JWT); a new key would sign everybody out.
+_secret_file = BASE_DIR / ".secret_key"
+if not os.environ.get("DJANGO_SECRET_KEY") and not _secret_file.exists():
+    _secret_file.write_text(get_random_secret_key())
+    _secret_file.chmod(0o600)
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY") or _secret_file.read_text()
+DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "backend"]
 
-DEBUG = os.environ.get('DJANGO_DEBUG', '1') == '1'
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    *DJ_REST_JWT_APPS,
+    "allauth.socialaccount.providers.google",
+]
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    *DJ_REST_JWT_MIDDLEWARE,
+]
 
-# Application definition
-
-INSTALLED_APPS = (
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'django.contrib.sites',
-    'rest_framework',
-    'rest_framework.authtoken',
-    # Gives password change/reset somewhere to record a revocation.
-    'rest_framework_simplejwt.token_blacklist',
-    'dj_rest_jwt',
-    'allauth',
-    'allauth.account',
-    'allauth.mfa',
-    'dj_rest_jwt.registration',
-    'dj_rest_jwt.mfa',
-    'dj_rest_jwt.passkeys',
-    'allauth.socialaccount',
-    'allauth.socialaccount.providers.facebook',
-    'drf_yasg',
-    'corsheaders'
-)
-
-MIDDLEWARE = (
-    'corsheaders.middleware.CorsMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'allauth.account.middleware.AccountMiddleware',
-)
-
-# For backwards compatibility for Django 1.8
-MIDDLEWARE_CLASSES = MIDDLEWARE
-
-ROOT_URLCONF = 'demo.urls'
-
-WSGI_APPLICATION = 'demo.wsgi.application'
-
-# Database
-# https://docs.djangoproject.com/en/1.7/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-    }
-}
-
-# Internationalization
-# https://docs.djangoproject.com/en/1.7/topics/i18n/
-
-LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
-
-USE_I18N = True
-
-USE_L10N = True
-
+ROOT_URLCONF = "demo.urls"
+WSGI_APPLICATION = "demo.wsgi.application"
+DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3"}}
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+STATIC_URL = "/static/"
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/1.7/howto/static-files/
+TEMPLATES = [{
+    "BACKEND": "django.template.backends.django.DjangoTemplates",
+    # Our copies of allauth's email templates live here and win over
+    # allauth's. Make your own with: python manage.py copy_email_templates templates/
+    "DIRS": [BASE_DIR / "templates"],
+    "APP_DIRS": True,
+    "OPTIONS": {"context_processors": [
+        "django.template.context_processors.request",
+        "django.contrib.auth.context_processors.auth",
+        "django.contrib.messages.context_processors.messages",
+    ]},
+}]
 
-STATIC_URL = '/static/'
+# --- Signing key -------------------------------------------------------------
+# DEV ONLY: a key generated on first run and kept next to the database so
+# tokens survive restarts. In production read it from a secret store.
+_key_file = BASE_DIR / ".jwt_key.pem"
+if os.environ.get("JWT_PRIVATE_KEY"):
+    HEADLESS_JWT_PRIVATE_KEY = os.environ["JWT_PRIVATE_KEY"]
+else:
+    if not _key_file.exists():
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
 
-# TEMPLATE_DIRS = [os.path.join(BASE_DIR, 'templates')]
+        _key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        _key_file.write_bytes(_key.private_bytes(
+            serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption(),
+        ))
+        _key_file.chmod(0o600)
+    HEADLESS_JWT_PRIVATE_KEY = _key_file.read_text()
 
-TEMPLATES = [
-    {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(DEMO_DIR, 'templates'), ],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
-            ],
-        },
-    },
-]
+# --- Email -------------------------------------------------------------------
+# Codes or links? One call picks every email flow. Try
+#   email_flows(verification="link", password_reset="link")
+# and the SPA's /verify-email/:key and /reset-password/:key routes take over.
+globals().update(email_flows(verification="code", password_reset="code", login_code=True))
 
-REST_AUTH = {
-    'SESSION_LOGIN': False,
-    'USE_JWT': False,
-    # This demo showcases the classic Token-auth flow (matches
-    # DEFAULT_AUTHENTICATION_CLASSES below) rather than the package's default
-    # JWT-only mode, so TOKEN_MODEL has to be set explicitly now that it
-    # defaults to None.
-    'TOKEN_MODEL': 'rest_framework.authtoken.models.Token',
-
-    'PASSKEY_RP_ID': 'localhost',
-    'PASSKEY_RP_NAME': 'dj-rest-jwt demo',
-    'PASSKEY_RP_ORIGINS': ['http://localhost:3000', 'http://localhost:8000'],
+# Where the SPA handles the links in emails (http://localhost:5173 is Vite).
+FRONTEND = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+HEADLESS_FRONTEND_URLS = {
+    "account_confirm_email": f"{FRONTEND}/verify-email/{{key}}",
+    "account_reset_password": f"{FRONTEND}/forgot-password",
+    "account_reset_password_from_key": f"{FRONTEND}/reset-password/{{key}}",
+    "account_signup": f"{FRONTEND}/signup",
+    "socialaccount_login_error": f"{FRONTEND}/login",
 }
 
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-SITE_ID = 1
-ACCOUNT_SIGNUP_FIELDS = ['email', 'username*', 'password1*', 'password2*']
-ACCOUNT_LOGIN_METHODS = {'username'}
-ACCOUNT_EMAIL_VERIFICATION = 'optional'
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"   # DEV ONLY: emails print to the console
+if os.environ.get("EMAIL_FILE_PATH"):   # used by the JS client's end-to-end tests to read codes
+    EMAIL_BACKEND = "django.core.mail.backends.filebased.EmailBackend"
+    EMAIL_FILE_PATH = os.environ["EMAIL_FILE_PATH"]
+DEFAULT_FROM_EMAIL = "Demo App <no-reply@example.com>"
+ACCOUNT_EMAIL_SUBJECT_PREFIX = "[Demo App] "
 
+# --- Social login ------------------------------------------------------------
+# Set GOOGLE_CLIENT_ID to show "Sign in with Google" (Google Identity Services
+# ID token -> POST auth/provider/token).
+if os.environ.get("GOOGLE_CLIENT_ID"):
+    SOCIALACCOUNT_PROVIDERS = {"google": {"APPS": [{
+        "client_id": os.environ["GOOGLE_CLIENT_ID"],
+        "secret": os.environ.get("GOOGLE_CLIENT_SECRET", ""),
+    }]}}
 
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework.authentication.TokenAuthentication',
-    ),
-    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema'
-}
-
-SWAGGER_SETTINGS = {
-    'LOGIN_URL': 'login',
-    'LOGOUT_URL': 'logout',
-}
-
-
-# CORS Configuration
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
-CORS_ALLOW_CREDENTIALS = True
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
-
-DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+# --- Local HTTP --------------------------------------------------------------
+if DEBUG:
+    # DEV ONLY: plain http://localhost. Never in production.
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    DJ_REST_JWT = {"COOKIE_SECURE": False}
+    MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN = True
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+    CSRF_TRUSTED_ORIGINS = [FRONTEND]

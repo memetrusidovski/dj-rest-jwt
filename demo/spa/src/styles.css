@@ -1,0 +1,65 @@
+:root {
+  --bg: #f4f4f7;
+  --card: #ffffff;
+  --text: #1f2330;
+  --muted: #6b7080;
+  --accent: #4f46e5;
+  --accent-text: #ffffff;
+  --border: #e3e4ea;
+  --danger: #c62f3c;
+  --ok: #1d7f4e;
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12131a;
+    --card: #1c1e27;
+    --text: #e8e9ef;
+    --muted: #9a9db0;
+    --accent: #8b85ff;
+    --accent-text: #12131a;
+    --border: #2d303d;
+    --danger: #ff6b78;
+    --ok: #4cd18d;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); line-height: 1.5; }
+main { max-width: 560px; margin: 0 auto; padding: 24px 16px 64px; display: grid; gap: 16px; }
+a { color: var(--accent); }
+code, pre { font-family: ui-monospace, Menlo, monospace; font-size: 0.9em; }
+pre { background: var(--bg); padding: 12px; border-radius: 8px; overflow-x: auto; }
+
+.nav { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px;
+  background: var(--card); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.nav nav { display: flex; gap: 16px; align-items: center; }
+.brand { font-weight: 700; text-decoration: none; }
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+.card h2 { margin: 0 0 12px; font-size: 1.15rem; }
+
+form { display: grid; gap: 12px; }
+.field { display: grid; gap: 4px; font-size: 0.9rem; }
+input { font: inherit; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg); color: var(--text); }
+input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+button { font: inherit; padding: 10px 16px; border-radius: 8px; border: 1px solid var(--accent);
+  background: var(--accent); color: var(--accent-text); cursor: pointer; font-weight: 600; }
+button:disabled { opacity: 0.6; cursor: default; }
+button.secondary { background: transparent; color: var(--accent); }
+button.danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+button.link { background: none; border: none; padding: 0; color: var(--accent); font-weight: 500; }
+button.link.danger { color: var(--danger); }
+
+.alt { display: grid; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.muted { color: var(--muted); font-size: 0.9rem; }
+.ok { color: var(--ok); }
+.errors { color: var(--danger); margin: 0; padding-left: 18px; }
+.rows { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 8px; }
+.rows li { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+
+.honeypot { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.overlay { position: fixed; inset: 0; background: rgb(0 0 0 / 0.45); display: grid; place-items: center; padding: 16px; z-index: 10; }
+.overlay .card { width: min(420px, 100%); }

@@ -1,82 +1,62 @@
-# dj-rest-jwt Demo Architecture
+# Demo
 
-This directory contains a complete demonstration of a modern Single Page Application (SPA) authentication flow using `dj-rest-jwt`.
+A React SPA and a Django backend wired together with dj-rest-jwt. It shows every
+flow end to end: signup with an emailed code, password and passkey sign-in,
+sign-in by emailed code, TOTP two-factor, recovery codes, password reset,
+step-up re-authentication, signed-in devices, and (with a Google client ID)
+Sign in with Google.
 
-## Overview
+| Part | What it shows |
+|---|---|
+| `backend/` | A Django project on the secure preset. `demo/settings.py` is the part to read. |
+| `backend/templates/account/email/` | Editing allauth's emails: an HTML layout plus HTML versions of the verification, reset and sign-in code emails. |
+| `spa/` | A Vite + React app built on [`dj-rest-jwt-client`](../js). `src/auth.ts` creates the client; the pages call it. |
 
-The demo consists of two main components:
-
-1.  **Backend (`demo/backend`)**: A Django project using `dj-rest-jwt`, `django-allauth`, and `djangorestframework-simplejwt`. It exposes REST APIs for registration, login, and Multi-Factor Authentication (MFA).
-2.  **Frontend (`demo/spa-client`)**: A Next.js application that consumes the backend APIs. It demonstrates a complete user flow including registration, login, MFA setup (QR code), and MFA verification.
-3.  **API tour (`demo/templates`)**: Server-rendered pages the backend serves at
-    [http://localhost:8000](http://localhost:8000) - one page per endpoint, driven by
-    [Alpine.js](https://alpinejs.dev) and [axios](https://axios-http.com) from a CDN, with no
-    build step. Each page submits a real request and shows the raw response beside the form,
-    which makes it the quickest way to poke at an endpoint without wiring up a client.
-
-## Architecture Diagram
-
-```mermaid
-graph TD
-    User[User / Browser]
-    subgraph Frontend [Next.js App (Port 3000)]
-        Pages[Pages]
-        AuthContext[Auth Context]
-        ApiClient[Axios Client]
-    end
-    subgraph Backend [Django API (Port 8000)]
-        DjRestAuth[dj-rest-jwt]
-        AllAuth[django-allauth]
-        MFA[MFA App]
-        DB[(SQLite DB)]
-    end
-
-    User -->|Interacts| Pages
-    Pages -->|Uses| AuthContext
-    AuthContext -->|Requests| ApiClient
-    ApiClient -->|HTTP Requests| DjRestAuth
-    
-    DjRestAuth -->|Auth Logic| AllAuth
-    DjRestAuth -->|MFA Logic| MFA
-    AllAuth -->|Persists| DB
-    MFA -->|Persists| DB
-
-    note1[Login Flow]
-    User -.->|1. Credentials| Pages
-    Pages -.->|2. Login| DjRestAuth
-    DjRestAuth -.->|3. MFA Required + Ephemeral Token| Pages
-    Pages -.->|4. Verify Code + Token| DjRestAuth
-    DjRestAuth -.->|5. Auth Token / Session| User
-```
-
-## Running the Demo
-
-The easiest way to run the demo is with Docker Compose:
+## Run it
 
 ```bash
-cd demo
-docker-compose up --build
-```
-- Frontend (Next.js SPA): [http://localhost:3000](http://localhost:3000)
-- Backend + API tour: [http://localhost:8000](http://localhost:8000)
-
-### Backend only
-
-The API tour needs nothing but the Django server, so if you only want to explore the
-endpoints:
-
-```bash
+# backend (Python 3.12+)
 cd demo/backend
 pip install -r requirements.txt
 python manage.py migrate
-python manage.py runserver
+python manage.py runserver          # http://localhost:8000
+
+# SPA, in another terminal (Node 20.19+)
+cd js && npm install && cd ../demo/spa
+npm install
+npm run dev                         # http://localhost:5173
 ```
 
-Then open [http://localhost:8000](http://localhost:8000) and work down the sidebar:
-sign up, log in, load your profile, enrol TOTP, and log in again to meet the second-factor
-challenge. The token from a successful login is held in `localStorage` and reused by every
-other page, so there is no copying tokens between forms.
+Or `docker compose up` in this directory.
 
-Note this project pins `USE_JWT = False` with a `TOKEN_MODEL`, so it demonstrates the classic
-token flow; the package's own default is JWT-only. Verification and password-reset emails are
-printed to the console the server is running in.
+Open http://localhost:5173. Emails (verification and reset codes) print in the
+backend's terminal. The admin is at http://localhost:5173/admin/ after
+`python manage.py createsuperuser`.
+
+Optional: `GOOGLE_CLIENT_ID=... python manage.py runserver` shows "Sign in with
+Google" (add `http://localhost:5173` as an authorized JavaScript origin).
+
+## Things to try
+
+- **Codes or links.** Change `email_flows(...)` in `backend/demo/settings.py` to
+  `verification="link", password_reset="link"`. Emails then link to the SPA's
+  `/verify-email/:key` and `/reset-password/:key` routes.
+- **Edit an email.** Change `backend/templates/account/email/base_message.html`
+  and sign up again. `python manage.py copy_email_templates templates/` copies
+  every allauth email for editing.
+- **Stay signed in.** Access tokens last 5 minutes. Leave the tab, come back
+  later, click "GET /api/me": the client refreshes on its own.
+- **Several tabs.** Sign out in one tab; the others follow.
+- **Revoke a device.** Sign in from a second browser, then end that session under
+  Account → Signed-in devices. Its next request fails immediately.
+
+## How the SPA reaches the API
+
+Vite proxies `/api` and `/admin` to Django (`spa/vite.config.ts`), so the SPA
+and the API share an origin and the httpOnly cookies just work. Do the same in
+production with one domain behind a reverse proxy, or put the API on a
+subdomain with CORS (`credentials: "include"`).
+
+The demo runs on plain `http://localhost`, so `settings.py` relaxes the
+`Secure` cookie flags and the WebAuthn origin check when `DEBUG` is on. Never
+copy those lines to production.

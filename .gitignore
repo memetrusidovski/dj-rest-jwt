@@ -112,5 +112,4 @@ demo/react-spa/yarn.lock
 
 # Visual Studio Code
 .vscode/
-demo/spa-client/node_modules
-demo/spa-client/.next
+site/

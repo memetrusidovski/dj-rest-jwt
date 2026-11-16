@@ -1,0 +1,34 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static "admin/css/login.css" %}">{% endblock %}
+{% block bodyclass %}{{ block.super }} login{% endblock %}
+{% block usertools %}{% endblock %}
+{% block nav-global %}{% endblock %}
+{% block nav-sidebar %}{% endblock %}
+{% block content_title %}{% endblock %}
+{% block breadcrumbs %}{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  {% if form.non_field_errors %}
+    {% for error in form.non_field_errors %}<p class="errornote">{{ error }}</p>{% endfor %}
+  {% endif %}
+  <form method="post" id="login-form">
+    {% csrf_token %}
+    {% for field in form.visible_fields %}
+      <div class="form-row">
+        {{ field.errors }}
+        {{ field.label_tag }} {{ field }}
+      </div>
+    {% endfor %}
+    {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+    {% if redirect_field_value %}
+      <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+    {% endif %}
+    <div class="submit-row">
+      <input type="submit" value="{% if is_mfa %}{% translate 'Verify' %}{% else %}{% translate 'Log in' %}{% endif %}">
+    </div>
+  </form>
+</div>
+{% endblock %}

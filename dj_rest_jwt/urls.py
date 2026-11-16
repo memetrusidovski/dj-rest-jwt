@@ -1,30 +1,29 @@
-from django.urls import re_path
+"""
+Mount with ``path("api/auth/", include("dj_rest_jwt.urls"))`` to get
+``/api/auth/v1/auth/login``, ``/api/auth/v1/tokens/refresh`` and so on.
 
-from dj_rest_jwt.app_settings import api_settings
+This is allauth's own app-client URL tree (``build_urlpatterns``) without the
+``_allauth/app/`` prefix. allauth binds the client to each view when it is
+built, not by path, so nothing depends on the prefix; the ``headless``
+namespace is kept so allauth's reverse() calls still resolve. New allauth
+endpoints appear here automatically.
+"""
+from allauth.headless.constants import Client
+from allauth.headless.urls import build_urlpatterns
+from django.urls import include, path
 
-from dj_rest_jwt.views import (
-    LoginView, LogoutView, PasswordChangeView, PasswordResetConfirmView,
-    PasswordResetView, UserDetailsView,
-)
+from .views import ChangePasswordView, TokenRefreshView
 
+app_name = "dj_rest_jwt"
 
-urlpatterns = [
-    # URLs that do not require a session or valid token
-    re_path(r'password/reset/?$', PasswordResetView.as_view(), name='rest_password_reset'),
-    re_path(r'password/reset/confirm/?$', PasswordResetConfirmView.as_view(), name='rest_password_reset_confirm'),
-    re_path(r'login/?$', LoginView.as_view(), name='rest_login'),
-    # URLs that require a user to be logged in with a valid session / token.
-    re_path(r'logout/?$', LogoutView.as_view(), name='rest_logout'),
-    re_path(r'user/?$', UserDetailsView.as_view(), name='rest_user_details'),
-    re_path(r'password/change/?$', PasswordChangeView.as_view(), name='rest_password_change'),
+# Our overrides of allauth views. They sit in the same "headless" namespace,
+# ahead of allauth's own patterns, so they shadow them and the transport
+# middleware treats their responses like any other allauth response.
+overrides = [
+    path("v1/account/password/change", ChangePasswordView.as_api_view(client=Client.APP), name="change_password"),
 ]
 
-if api_settings.USE_JWT:
-    from rest_framework_simplejwt.views import TokenVerifyView
-
-    from dj_rest_jwt.jwt_auth import get_refresh_view
-
-    urlpatterns += [
-        re_path(r'token/verify/?$', TokenVerifyView.as_view(), name='token_verify'),
-        re_path(r'token/refresh/?$', get_refresh_view().as_view(), name='token_refresh'),
-    ]
+urlpatterns = [
+    path("v1/tokens/refresh", TokenRefreshView.as_view(), name="token_refresh"),
+    path("", include((overrides + build_urlpatterns(Client.APP), "headless"), namespace="headless")),
+]

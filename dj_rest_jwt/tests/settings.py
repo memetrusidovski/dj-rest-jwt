@@ -1,143 +1,59 @@
-import logging
-import os
-import sys
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
+from dj_rest_jwt.defaults import *  # noqa: F401,F403
+from dj_rest_jwt.defaults import DJ_REST_JWT_APPS, DJ_REST_JWT_MIDDLEWARE
 
-PROJECT_ROOT = os.path.abspath(os.path.split(os.path.split(__file__)[0])[0])
-
-
-logging.disable(logging.CRITICAL)
-ROOT_URLCONF = 'urls'
-STATIC_URL = '/static/'
-STATIC_ROOT = f'{PROJECT_ROOT}/staticserve'
-STATICFILES_DIRS = ()
-UPLOADS_DIR_NAME = 'uploads'
-MEDIA_URL = f'/{UPLOADS_DIR_NAME}/'
-MEDIA_ROOT = os.path.join(PROJECT_ROOT, f'{UPLOADS_DIR_NAME}')
-
-IS_DEV = False
-IS_STAGING = False
-IS_PROD = False
-IS_TEST = 'test' in sys.argv or 'test_coverage' in sys.argv
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': ':memory:',
-    },
-}
-
-MIDDLEWARE = [
-    'django.middleware.common.CommonMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'allauth.account.middleware.AccountMiddleware',
-]
-
-# Adding for backwards compatibility for Django 1.8 tests
-MIDDLEWARE_CLASSES = MIDDLEWARE
-
-TEMPLATE_CONTEXT_PROCESSORS = [
-    'django.contrib.auth.context_processors.auth',
-    'django.contrib.messages.context_processors.messages',
-    'django.template.context_processors.request',
-]
-
-# avoid deprecation warnings during tests
-TEMPLATES = [
-    {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [
-            # insert your TEMPLATE_DIRS here
-        ],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': TEMPLATE_CONTEXT_PROCESSORS,
-        },
-    },
-]
-
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework.authentication.SessionAuthentication',
-        'dj_rest_jwt.jwt_auth.JWTCookieAuthentication',
-    ),
-}
-
-TEST_RUNNER = 'xmlrunner.extra.djangotestrunner.XMLTestRunner'
-TEST_OUTPUT_DIR = 'test-results'
+SECRET_KEY = "tests-only"
+DEBUG = False
+ALLOWED_HOSTS = ["testserver"]
+ROOT_URLCONF = "dj_rest_jwt.tests.urls"
 
 INSTALLED_APPS = [
-    'django.contrib.messages',
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.humanize',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.sites',
-    'django.contrib.sitemaps',
-    'django.contrib.staticfiles',
-
-    'allauth',
-    'allauth.account',
-    'allauth.socialaccount',
-    'allauth.socialaccount.providers.facebook',
-    'allauth.socialaccount.providers.twitter',
-    'allauth.socialaccount.providers.google',
-    'allauth.socialaccount.providers.github',
-    'allauth.socialaccount.providers.microsoft',
-    'allauth.socialaccount.providers.apple',
-
-    'rest_framework',
-    'rest_framework.authtoken',
-
-    'dj_rest_jwt',
-    'dj_rest_jwt.registration',
-    'dj_rest_jwt.passkeys',
-    # Installed so the suite exercises the app exactly as a project would: with
-    # its own app label and its migration actually applied. Leaving it out meant
-    # Authenticator was quietly adopted by the `dj_rest_jwt` app and created by
-    # run-syncdb, so the migration was never run in CI.
-    'dj_rest_jwt.mfa',
-
-    'rest_framework_simplejwt.token_blacklist',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    *DJ_REST_JWT_APPS,
+    "allauth.socialaccount.providers.google",
 ]
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    *DJ_REST_JWT_MIDDLEWARE,
+]
+TEMPLATES = [{
+    "BACKEND": "django.template.backends.django.DjangoTemplates",
+    "APP_DIRS": True,
+    "OPTIONS": {"context_processors": [
+        "django.template.context_processors.request",
+        "django.contrib.auth.context_processors.auth",
+        "django.contrib.messages.context_processors.messages",
+    ]},
+}]
+DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}}
+CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+STATIC_URL = "static/"
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]   # speed; checked separately
+SILENCED_SYSTEM_CHECKS = ["dj_rest_jwt.W008"]
 
-SECRET_KEY = '38dh*skf8sjfhs287dh&^hd8&3hdg*j2&sd'
-ACCOUNT_ACTIVATION_DAYS = 1
-# With the default rate limits of allauth only one email confirmation per 180s is supported
-ACCOUNT_RATE_LIMITS = {
-    'confirm_email': None
+HEADLESS_JWT_PRIVATE_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048).private_bytes(
+    serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption(),
+).decode()
+HEADLESS_FRONTEND_URLS = {
+    "account_confirm_email": "https://app.example.com/account/verify-email/{key}",
+    "account_reset_password": "https://app.example.com/account/password/reset",
+    "account_reset_password_from_key": "https://app.example.com/account/password/reset/key/{key}",
+    "account_signup": "https://app.example.com/account/signup",
 }
-SITE_ID = 1
-
-AUTHENTICATION_BACKENDS = (
-    # Needed to login by username in Django admin, regardless of `allauth`
-    'django.contrib.auth.backends.ModelBackend',
-    # `allauth` specific authentication methods, such as login by e-mail
-    'allauth.account.auth_backends.AuthenticationBackend',
-)
-
-REST_AUTH = {
-    # Pinned explicitly: the package now defaults to TOKEN_MODEL=None/USE_JWT=True/
-    # SESSION_LOGIN=False (JWT-only, zero-config). This suite exercises the token+session
-    # code paths by default and opts into JWT per-test via @override_api_settings(USE_JWT=True),
-    # so it needs the classic settings pinned rather than inheriting the new defaults.
-    'TOKEN_MODEL': 'rest_framework.authtoken.models.Token',
-    'SESSION_LOGIN': True,
-    'USE_JWT': False,
-
-    # Rate limiting is disabled ambiently so existing tests (many of which log in
-    # repeatedly within a single test) aren't cross-polluted by the shared test
-    # cache. It's exercised explicitly in test_throttling.py via override_api_settings.
-    'RATE_LIMIT_LOGIN': None,
-    'RATE_LIMIT_REGISTER': None,
-    'RATE_LIMIT_PASSWORD_RESET': None,
-    'RATE_LIMIT_SENSITIVE_ACTION': None,
-
-    'PASSKEY_RP_ID': 'localhost',
-    'PASSKEY_RP_NAME': 'Test App',
-    'PASSKEY_RP_ORIGINS': ['http://localhost:8000'],
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {"APPS": [{"client_id": "test-google-client", "secret": ""}]},
 }

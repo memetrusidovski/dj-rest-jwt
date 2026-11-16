@@ -1,358 +1,97 @@
-from django.conf import settings
-from django.contrib.auth import get_user_model
-from django.contrib.auth import login as django_login
-from django.contrib.auth import logout as django_logout
-from django.core.exceptions import ObjectDoesNotExist
-from django.utils import timezone
+import json
+
+from allauth.headless import app_settings as headless_settings
+from allauth.headless.account.views import ChangePasswordView as AllauthChangePasswordView
+from django.http import JsonResponse
 from django.utils.decorators import method_decorator
-from django.utils.translation import gettext_lazy as _
-from django.views.decorators.debug import sensitive_post_parameters
-from rest_framework import status
-from rest_framework.generics import GenericAPIView, RetrieveUpdateAPIView
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.response import Response
-from rest_framework.views import APIView
+from django.views import View
+from django.views.decorators.csrf import csrf_exempt
 
-from .app_settings import api_settings
-from .models import get_token_model
-from .throttling import (
-    LoginRateThrottle, PasswordResetRateThrottle, SensitiveAccountActionRateThrottle,
-)
-from .utils import jwt_encode
+from . import conf
+from .transport import clear_token_cookies, csrf_failure_reason, set_token_cookies, uses_cookies
 
 
-sensitive_post_parameters_m = method_decorator(
-    sensitive_post_parameters(
-        'password', 'old_password', 'new_password1', 'new_password2',
-    ),
-)
+def _error(status, code="invalid_token"):
+    return JsonResponse({"status": status, "errors": [{"code": code}]}, status=status)
 
 
-def mfa_app_installed():
-    """Whether the optional `dj_rest_jwt.mfa` app is part of this project."""
-    from django.apps import apps
-    return apps.is_installed('dj_rest_jwt.mfa')
-
-
-class LoginView(GenericAPIView):
+@method_decorator(csrf_exempt, name="dispatch")
+class TokenRefreshView(View):
     """
-    Check the credentials and return the REST Token
-    if the credentials are valid and authenticated.
-    Calls Django Auth login method to register User ID
-    in Django session framework
+    Replaces allauth's ``tokens/refresh`` so the refresh token can live in an
+    httpOnly cookie. Same request/response shape as allauth's.
 
-    Accept the following POST parameters: username, password
-    Return the REST Framework Token Object's key.
+    cookie transport: the refresh token comes from the cookie (CSRF-checked)
+    and the new pair goes back as cookies. header transport: body in, body
+    out, cookies ignored.
+
+    409 ``token_rotated``: this refresh token was just rotated by a parallel
+    refresh. Not a failure; retry with the current tokens.
     """
-    permission_classes = (AllowAny,)
-    serializer_class = api_settings.LOGIN_SERIALIZER
-    throttle_classes = (LoginRateThrottle,)
 
-    user = None
-    access_token = None
-    token = None
-    ephemeral_token = None
-
-    @sensitive_post_parameters_m
-    def dispatch(self, *args, **kwargs):
-        return super().dispatch(*args, **kwargs)
-
-    def process_login(self):
-        django_login(self.request, self.user)
-
-    def mfa_required(self):
-        """
-        Whether this login has to be completed with a second factor.
-
-        Lives on the base view on purpose: every alternative entry point
-        (social login, passkeys, anything else subclassing LoginView) has to
-        honour a user's enrolled second factor, and a check that each subclass
-        had to remember to add is a check that eventually gets forgotten.
-        """
-        if not mfa_app_installed():
-            return False
-        from .mfa.utils import is_mfa_enabled
-        return is_mfa_enabled(self.user)
-
-    def issue_tokens(self):
-        """Mint the auth token(s) for `self.user`. First factor is done by now."""
-        token_model = get_token_model()
-
-        if api_settings.USE_JWT:
-            self.access_token, self.refresh_token = jwt_encode(self.user)
-        elif token_model:
-            self.token = api_settings.TOKEN_CREATOR(token_model, self.user, self.serializer)
-
-        if api_settings.SESSION_LOGIN:
-            self.process_login()
-
-    def get_response_serializer(self):
-        if api_settings.USE_JWT:
-
-            if api_settings.JWT_AUTH_RETURN_EXPIRATION:
-                response_serializer = api_settings.JWT_SERIALIZER_WITH_EXPIRATION
-            else:
-                response_serializer = api_settings.JWT_SERIALIZER
-
+    def post(self, request):
+        cookies = uses_cookies(request)
+        if cookies:
+            token = request.COOKIES.get(conf.get("REFRESH_COOKIE_NAME"))
+            if not token:
+                return _error(401)
+            if csrf_failure_reason(request):
+                return _error(403, "csrf_failed")
         else:
-            response_serializer = api_settings.TOKEN_SERIALIZER
-        return response_serializer
+            try:
+                data = json.loads(request.body or b"{}")
+            except ValueError:
+                data = {}
+            token = data.get("refresh_token") if isinstance(data, dict) else None
+            if not token:
+                return _error(400, "required")
 
-    def login(self):
-        self.user = self.serializer.validated_data['user']
+        strategy = headless_settings.TOKEN_STRATEGY
+        result = strategy.refresh_token(token)
+        if result is None and getattr(strategy, "recently_rotated", None) and strategy.recently_rotated(token):
+            # Lost a race with another tab/request that refreshed first. Keep
+            # the cookies (they already hold the winner's tokens); the client
+            # retries with those.
+            return _error(409, "token_rotated")
+        if result is None:
+            response = _error(401)
+            if cookies:
+                clear_token_cookies(response)
+            return response
 
-        if self.mfa_required():
-            from .mfa.utils import create_ephemeral_token
-            self.ephemeral_token = create_ephemeral_token(self.user)
-            return
+        access, refresh = result
+        if cookies:
+            response = JsonResponse({"status": 200, "data": {}})
+            set_token_cookies(request, response, access, refresh)
+            return response
+        payload = {"access_token": access}
+        if refresh != token:
+            payload["refresh_token"] = refresh
+        return JsonResponse({"status": 200, "data": payload})
 
-        self.issue_tokens()
 
-    def get_mfa_challenge_response(self):
-        return Response(
-            {'ephemeral_token': self.ephemeral_token, 'mfa_required': True},
-            status=status.HTTP_200_OK,
-        )
+class ChangePasswordView(AllauthChangePasswordView):
+    """
+    allauth's password change, but the device that made the change stays
+    signed in.
 
-    def get_response(self):
-        if self.ephemeral_token:
-            return self.get_mfa_challenge_response()
+    Changing the password rotates the session key (Django's
+    update_session_auth_hash), which orphans the JWTs that pointed at the old
+    key. Every *other* device should be cut off by that; this one should not.
+    So when the key rotates, mint a fresh pair for the new session and hand
+    it out the same way a login does (the transport middleware delivers it).
+    """
 
-        serializer_class = self.get_response_serializer()
-
-        if api_settings.USE_JWT:
-            from rest_framework_simplejwt.settings import (
-                api_settings as jwt_settings,
-            )
-            access_token_expiration = (timezone.now() + jwt_settings.ACCESS_TOKEN_LIFETIME)
-            refresh_token_expiration = (timezone.now() + jwt_settings.REFRESH_TOKEN_LIFETIME)
-            return_expiration_times = api_settings.JWT_AUTH_RETURN_EXPIRATION
-            auth_httponly = api_settings.JWT_AUTH_HTTPONLY
-
-            data = {
-                'user': self.user,
-                'access': self.access_token,
-            }
-
-            # Only omit the refresh token from the body if it's actually
-            # retrievable some other way (an httponly cookie) - otherwise,
-            # with the zero-config defaults (HTTPONLY on, no cookie name
-            # configured), the refresh token would end up nowhere at all.
-            if not auth_httponly or not api_settings.JWT_AUTH_REFRESH_COOKIE:
-                data['refresh'] = self.refresh_token
-            else:
-                data['refresh'] = ""
-
-            if return_expiration_times:
-                data['access_expiration'] = access_token_expiration
-                data['refresh_expiration'] = refresh_token_expiration
-
-            serializer = serializer_class(
-                instance=data,
-                context=self.get_serializer_context(),
-            )
-        elif self.token:
-            serializer = serializer_class(
-                instance=self.token,
-                context=self.get_serializer_context(),
-            )
-        else:
-            return Response(status=status.HTTP_204_NO_CONTENT)
-
-        response = Response(serializer.data, status=status.HTTP_200_OK)
-        if api_settings.USE_JWT:
-            from .jwt_auth import set_jwt_cookies
-            set_jwt_cookies(response, self.access_token, self.refresh_token)
+    def post(self, request, *args, **kwargs):
+        before = request.session.session_key
+        response = super().post(request, *args, **kwargs)
+        if response.status_code != 200 or request.session.session_key == before:
+            return response
+        tokens = headless_settings.TOKEN_STRATEGY.create_access_token_payload(request)
+        if not tokens:
+            return response
+        body = json.loads(response.content)
+        body.setdefault("meta", {}).update(tokens)
+        response.content = json.dumps(body)
+        response["Content-Length"] = str(len(response.content))
         return response
-
-    def post(self, request, *args, **kwargs):
-        self.request = request
-        self.serializer = self.get_serializer(data=self.request.data)
-        self.serializer.is_valid(raise_exception=True)
-
-        self.login()
-        return self.get_response()
-
-
-class LogoutView(APIView):
-    """
-    Calls Django logout method and delete the Token object
-    assigned to the current User object.
-
-    Accepts/Returns nothing.
-    """
-    permission_classes = (AllowAny,)
-    throttle_classes = (SensitiveAccountActionRateThrottle,)
-
-    def get(self, request, *args, **kwargs):
-        if getattr(settings, 'ACCOUNT_LOGOUT_ON_GET', False):
-            response = self.logout(request)
-        else:
-            response = self.http_method_not_allowed(request, *args, **kwargs)
-
-        return self.finalize_response(request, response, *args, **kwargs)
-
-    def post(self, request, *args, **kwargs):
-        return self.logout(request)
-
-    def logout(self, request):
-        if not (request.auth or api_settings.USE_JWT or api_settings.SESSION_LOGIN):
-            return Response(
-                {'detail': _('You should be logged in to logout. Check whether the token is passed.')},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        try:
-            request.user.auth_token.delete()
-        except (AttributeError, ObjectDoesNotExist):
-            pass
-
-        if api_settings.SESSION_LOGIN:
-            django_logout(request)
-
-        response = Response(
-            {'detail': _('Successfully logged out.')},
-            status=status.HTTP_200_OK,
-        )
-
-        if api_settings.USE_JWT:
-            # NOTE: this import occurs here rather than at the top level
-            # because JWT support is optional, and if `USE_JWT` isn't
-            # True we shouldn't need the dependency
-            from rest_framework_simplejwt.exceptions import TokenError
-            from rest_framework_simplejwt.tokens import RefreshToken
-
-            from .jwt_auth import unset_jwt_cookies
-            cookie_name = api_settings.JWT_AUTH_COOKIE
-
-            unset_jwt_cookies(response)
-
-            if 'rest_framework_simplejwt.token_blacklist' in settings.INSTALLED_APPS:
-                # add refresh token to blacklist
-                try:
-                    token: RefreshToken = RefreshToken(None)
-                    if api_settings.JWT_AUTH_HTTPONLY:
-                        try:
-                            token = RefreshToken(request.COOKIES[api_settings.JWT_AUTH_REFRESH_COOKIE])
-                        except KeyError:
-                            response.data = {'detail': _('Refresh token was not included in cookie data.')}
-                            response.status_code = status.HTTP_401_UNAUTHORIZED
-                    else:
-                        try:
-                            token = RefreshToken(request.data['refresh'])
-                        except KeyError:
-                            response.data = {'detail': _('Refresh token was not included in request data.')}
-                            response.status_code = status.HTTP_401_UNAUTHORIZED
-
-                    token.blacklist()
-                except TokenError as error:
-                    response.data = {'detail': _(str(error))}
-                    response.status_code = status.HTTP_401_UNAUTHORIZED
-                except (AttributeError, TypeError):
-                    response.data = {'detail': _('An error has occurred.')}
-                    response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-
-            elif not cookie_name:
-                message = _(
-                    'Neither cookies or blacklist are enabled, so the token '
-                    'has not been deleted server side. Please make sure the token is deleted client side.',
-                )
-                response.data = {'detail': message}
-                response.status_code = status.HTTP_200_OK
-        return response
-
-
-class UserDetailsView(RetrieveUpdateAPIView):
-    """
-    Reads and updates UserModel fields
-    Accepts GET, PUT, PATCH methods.
-
-    Default accepted fields: username, first_name, last_name
-    Default display fields: pk, username, email, first_name, last_name
-    Read-only fields: pk, email
-
-    Returns UserModel fields.
-    """
-    serializer_class = api_settings.USER_DETAILS_SERIALIZER
-    permission_classes = (IsAuthenticated,)
-
-    def get_object(self):
-        return self.request.user
-
-    def get_queryset(self):
-        """
-        Adding this method since it is sometimes called when using
-        django-rest-swagger
-        """
-        return get_user_model().objects.none()
-
-
-class PasswordResetView(GenericAPIView):
-    """
-    Calls Django Auth PasswordResetForm save method.
-
-    Accepts the following POST parameters: email
-    Returns the success/fail message.
-    """
-    serializer_class = api_settings.PASSWORD_RESET_SERIALIZER
-    permission_classes = (AllowAny,)
-    throttle_classes = (PasswordResetRateThrottle,)
-
-    def post(self, request, *args, **kwargs):
-        # Create a serializer with request.data
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        serializer.save()
-        # Return the success message with OK HTTP status
-        return Response(
-            {'detail': _('Password reset e-mail has been sent.')},
-            status=status.HTTP_200_OK,
-        )
-
-
-class PasswordResetConfirmView(GenericAPIView):
-    """
-    Password reset e-mail link is confirmed, therefore
-    this resets the user's password.
-
-    Accepts the following POST parameters: token, uid,
-        new_password1, new_password2
-    Returns the success/fail message.
-    """
-    serializer_class = api_settings.PASSWORD_RESET_CONFIRM_SERIALIZER
-    permission_classes = (AllowAny,)
-    throttle_classes = (PasswordResetRateThrottle,)
-
-    @sensitive_post_parameters_m
-    def dispatch(self, *args, **kwargs):
-        return super().dispatch(*args, **kwargs)
-
-    def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(
-            {'detail': _('Password has been reset with the new password.')},
-        )
-
-
-class PasswordChangeView(GenericAPIView):
-    """
-    Calls Django Auth SetPasswordForm save method.
-
-    Accepts the following POST parameters: new_password1, new_password2
-    Returns the success/fail message.
-    """
-    serializer_class = api_settings.PASSWORD_CHANGE_SERIALIZER
-    permission_classes = (IsAuthenticated,)
-    throttle_classes = (SensitiveAccountActionRateThrottle,)
-
-    @sensitive_post_parameters_m
-    def dispatch(self, *args, **kwargs):
-        return super().dispatch(*args, **kwargs)
-
-    def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response({'detail': _('New password has been saved.')})

@@ -1,5 +1,4 @@
-# This file mainly exists to allow python setup.py test to work.
-# flake8: noqa
+#!/usr/bin/env python
 import os
 import sys
 
@@ -7,20 +6,14 @@ import django
 from django.conf import settings
 from django.test.utils import get_runner
 
-os.environ['DJANGO_SETTINGS_MODULE'] = 'dj_rest_jwt.tests.settings'
-test_dir = os.path.join(os.path.dirname(__file__), 'dj_rest_jwt')
-sys.path.insert(0, test_dir)
 
-
-
-def runtests():
-    TestRunner = get_runner(settings)
-    test_runner = TestRunner(verbosity=1, interactive=True)
-    if hasattr(django, 'setup'):
-        django.setup()
-    failures = test_runner.run_tests(['dj_rest_jwt'])
+def runtests(labels=None):
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "dj_rest_jwt.tests.settings")
+    django.setup()
+    runner = get_runner(settings)(verbosity=1, interactive=False)
+    failures = runner.run_tests(labels or ["dj_rest_jwt.tests"])
     sys.exit(bool(failures))
 
 
-if __name__ == '__main__':
-    runtests()
+if __name__ == "__main__":
+    runtests(sys.argv[1:])
